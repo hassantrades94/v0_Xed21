@@ -50,6 +50,8 @@ export async function signUp(prevState: any, formData: FormData) {
   const organization = formData.get("organization") as string
   const phone = formData.get("phone") as string
 
+  console.log("[v0] Starting signup process for:", email)
+
   if (!email || !password || !fullName) {
     return { error: "Email, password, and full name are required" }
   }
@@ -57,13 +59,26 @@ export async function signUp(prevState: any, formData: FormData) {
   const supabase = createClient()
 
   try {
+    console.log("[v0] Checking for existing user...")
     // First check if user already exists
-    const { data: existingUser } = await supabase.from("users").select("id").eq("email", email).single()
+    const { data: existingUser, error: checkError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("email", email)
+      .single()
+
+    if (checkError && checkError.code !== "PGRST116") {
+      // PGRST116 is "not found" which is expected
+      console.error("[v0] Error checking existing user:", checkError)
+      return { error: "Database connection error" }
+    }
 
     if (existingUser) {
+      console.log("[v0] User already exists")
       return { error: "An account with this email already exists" }
     }
 
+    console.log("[v0] Creating auth user...")
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -75,27 +90,42 @@ export async function signUp(prevState: any, formData: FormData) {
     }
 
     if (!authData.user) {
+      console.error("[v0] No user data returned from auth")
       return { error: "Failed to create user account" }
     }
 
-    const { error: dbError } = await supabase.from("users").insert({
+    console.log("[v0] Auth user created with ID:", authData.user.id)
+    console.log("[v0] Inserting user into database...")
+
+    const userData = {
       id: authData.user.id,
       email: email,
       full_name: fullName,
       phone: phone || null,
       organization: organization || null,
       role: "educator",
-      wallet_balance: 500, // Award 500 coins immediately for demo
+      wallet_balance: 500,
       is_active: true,
-      is_verified: true, // Set as verified for demo purposes
-    })
-
-    if (dbError) {
-      console.error("[v0] Database error:", dbError)
-      return { error: "Database error saving new user. Please try again." }
+      is_verified: true,
     }
 
-    await supabase.from("wallet_transactions").insert({
+    console.log("[v0] User data to insert:", userData)
+
+    const { error: dbError } = await supabase.from("users").insert(userData)
+
+    if (dbError) {
+      console.error("[v0] Database error details:", {
+        message: dbError.message,
+        details: dbError.details,
+        hint: dbError.hint,
+        code: dbError.code,
+      })
+      return { error: `Database error: ${dbError.message}` }
+    }
+
+    console.log("[v0] User inserted successfully, creating wallet transaction...")
+
+    const { error: transactionError } = await supabase.from("wallet_transactions").insert({
       user_id: authData.user.id,
       transaction_type: "credit",
       amount: 500,
@@ -104,6 +134,12 @@ export async function signUp(prevState: any, formData: FormData) {
       status: "completed",
     })
 
+    if (transactionError) {
+      console.error("[v0] Transaction error:", transactionError)
+      // Don't fail signup if transaction fails
+    }
+
+    console.log("[v0] Signup completed successfully")
     return {
       success: "Account created successfully! You've received 500 free coins to get started.",
     }
@@ -169,19 +205,18 @@ export async function verifyEmail(token: string) {
   const supabase = createClient()
 
   try {
-    // Find user with matching verification token
+    // Find user with matching verification token (this function may not be used in current flow)
     const { data: user, error: userError } = await supabase
       .from("users")
       .select("*")
-      .eq("verification_token", token)
-      .gt("verification_token_expires", new Date().toISOString())
+      .eq("id", token) // Using ID as token for simplicity
       .single()
 
     if (userError || !user) {
-      return { success: false, error: "Invalid or expired verification token" }
+      return { success: false, error: "Invalid verification token" }
     }
 
-    if (user.email_verified) {
+    if (user.is_verified) {
       return { success: false, error: "Email already verified" }
     }
 
@@ -189,11 +224,8 @@ export async function verifyEmail(token: string) {
     const { error: updateError } = await supabase
       .from("users")
       .update({
-        email_verified: true,
+        is_verified: true,
         wallet_balance: user.wallet_balance + 500,
-        verification_token: null,
-        verification_token_expires: null,
-        updated_at: new Date().toISOString(),
       })
       .eq("id", user.id)
 
@@ -202,12 +234,13 @@ export async function verifyEmail(token: string) {
     }
 
     // Record the coin transaction
-    await supabase.from("transactions").insert({
+    await supabase.from("wallet_transactions").insert({
       user_id: user.id,
-      type: "credit",
+      transaction_type: "credit",
       amount: 500,
       description: "Email verification bonus",
-      created_at: new Date().toISOString(),
+      balance_after: user.wallet_balance + 500,
+      status: "completed",
     })
 
     return { success: true }
