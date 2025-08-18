@@ -69,17 +69,13 @@ export async function signUp(prevState: any, formData: FormData) {
     const verificationToken = randomBytes(32).toString("hex")
     const tokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
 
-    // Create auth user first
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        emailRedirectTo:
-          process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
-      },
     })
 
     if (authError) {
+      console.error("Auth error:", authError)
       return { error: authError.message }
     }
 
@@ -87,7 +83,6 @@ export async function signUp(prevState: any, formData: FormData) {
       return { error: "Failed to create user account" }
     }
 
-    // Create user profile in database
     const { error: dbError } = await supabase.from("users").insert({
       id: authData.user.id,
       email: email,
@@ -99,19 +94,11 @@ export async function signUp(prevState: any, formData: FormData) {
       email_verified: false,
       verification_token: verificationToken,
       verification_token_expires: tokenExpiry.toISOString(),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
     })
 
     if (dbError) {
       console.error("Database error:", dbError)
-      // Clean up auth user if database insert fails
-      try {
-        await supabase.auth.admin.deleteUser(authData.user.id)
-      } catch (cleanupError) {
-        console.error("Failed to cleanup auth user:", cleanupError)
-      }
-      return { error: "Failed to create user profile. Please try again." }
+      return { error: "Database error saving new user. Please try again." }
     }
 
     // Send verification email
