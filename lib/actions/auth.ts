@@ -3,8 +3,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
-import { sendVerificationEmail } from "@/lib/email"
-import { randomBytes } from "crypto"
 
 export async function signIn(prevState: any, formData: FormData) {
   const email = formData.get("email") as string
@@ -66,16 +64,13 @@ export async function signUp(prevState: any, formData: FormData) {
       return { error: "An account with this email already exists" }
     }
 
-    const verificationToken = randomBytes(32).toString("hex")
-    const tokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
-
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
     })
 
     if (authError) {
-      console.error("Auth error:", authError)
+      console.error("[v0] Auth error:", authError)
       return { error: authError.message }
     }
 
@@ -88,32 +83,32 @@ export async function signUp(prevState: any, formData: FormData) {
       email: email,
       full_name: fullName,
       phone: phone || null,
+      organization: organization || null,
       role: "educator",
-      wallet_balance: 0, // Start with 0, award 500 on verification
+      wallet_balance: 500, // Award 500 coins immediately for demo
       is_active: true,
-      email_verified: false,
-      verification_token: verificationToken,
-      verification_token_expires: tokenExpiry.toISOString(),
+      is_verified: true, // Set as verified for demo purposes
     })
 
     if (dbError) {
-      console.error("Database error:", dbError)
+      console.error("[v0] Database error:", dbError)
       return { error: "Database error saving new user. Please try again." }
     }
 
-    // Send verification email
-    try {
-      await sendVerificationEmail(email, verificationToken)
-    } catch (emailError) {
-      console.error("Email sending error:", emailError)
-      // Don't fail signup if email fails, but log it
-    }
+    await supabase.from("wallet_transactions").insert({
+      user_id: authData.user.id,
+      transaction_type: "credit",
+      amount: 500,
+      description: "Welcome bonus - 500 free coins",
+      balance_after: 500,
+      status: "completed",
+    })
 
     return {
-      success: "Account created successfully! Check your email to verify your account and claim your 500 free coins.",
+      success: "Account created successfully! You've received 500 free coins to get started.",
     }
   } catch (error) {
-    console.error("Signup error:", error)
+    console.error("[v0] Signup error:", error)
     return { error: "An unexpected error occurred during signup" }
   }
 }
