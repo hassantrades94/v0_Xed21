@@ -1,8 +1,7 @@
 "use client"
 
 import type React from "react"
-
-import { useState, useTransition } from "react"
+import { useState, useTransition, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -11,9 +10,9 @@ import { Switch } from "@/components/ui/switch"
 import { Loader2, Zap, Coins, Eye, EyeOff } from "lucide-react"
 import { generateQuestions } from "@/lib/actions/questions"
 import { toast } from "@/components/ui/sonner"
+import { createClient } from "@/lib/supabase/client"
 
 interface QuestionGeneratorProps {
-  boards: any[]
   userProfile: any
 }
 
@@ -111,9 +110,9 @@ const questionSamples = {
   },
 }
 
-export default function QuestionGenerator({ boards, userProfile }: QuestionGeneratorProps) {
+export default function QuestionGenerator({ userProfile }: QuestionGeneratorProps) {
   const [formData, setFormData] = useState({
-    boardId: "1", // Default to CBSE
+    boardId: "",
     grade: "",
     subjectId: "",
     topicId: "",
@@ -127,10 +126,82 @@ export default function QuestionGenerator({ boards, userProfile }: QuestionGener
   const [showGenerated, setShowGenerated] = useState(false)
   const [showConfidence, setShowConfidence] = useState(true)
 
-  const selectedBoard = boards.find((b) => b.id.toString() === formData.boardId)
-  const availableSubjects = selectedBoard?.subjects || []
-  const selectedSubject = availableSubjects.find((s) => s.id.toString() === formData.subjectId)
-  const availableTopics = selectedSubject?.topics || []
+  const [boards, setBoards] = useState<any[]>([])
+  const [subjects, setSubjects] = useState<any[]>([])
+  const [topics, setTopics] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const supabase = createClient()
+
+  useEffect(() => {
+    loadBoards()
+  }, [])
+
+  useEffect(() => {
+    if (formData.boardId && formData.grade) {
+      loadSubjects(formData.boardId, Number.parseInt(formData.grade))
+    } else {
+      setSubjects([])
+      setTopics([])
+    }
+  }, [formData.boardId, formData.grade])
+
+  useEffect(() => {
+    if (formData.subjectId) {
+      loadTopics(formData.subjectId)
+    } else {
+      setTopics([])
+    }
+  }, [formData.subjectId])
+
+  const loadBoards = async () => {
+    try {
+      const { data, error } = await supabase.from("boards").select("*").eq("is_active", true).order("name")
+
+      if (error) throw error
+      setBoards(data || [])
+    } catch (error) {
+      console.error("Error loading boards:", error)
+      toast.error("Failed to load boards")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadSubjects = async (boardId: string, gradeLevel: number) => {
+    try {
+      const { data, error } = await supabase
+        .from("subjects")
+        .select("*")
+        .eq("board_id", boardId)
+        .eq("grade_level", gradeLevel)
+        .eq("is_active", true)
+        .order("name")
+
+      if (error) throw error
+      setSubjects(data || [])
+    } catch (error) {
+      console.error("Error loading subjects:", error)
+      toast.error("Failed to load subjects")
+    }
+  }
+
+  const loadTopics = async (subjectId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("topics")
+        .select("*")
+        .eq("subject_id", subjectId)
+        .eq("is_active", true)
+        .order("order_index", { ascending: true })
+
+      if (error) throw error
+      setTopics(data || [])
+    } catch (error) {
+      console.error("Error loading topics:", error)
+      toast.error("Failed to load topics")
+    }
+  }
 
   const costPerQuestion = bloomLevels[formData.bloomTaxonomy as keyof typeof bloomLevels]?.coins || 7
   const totalCost = Number.parseInt(formData.questionCount || "0") * costPerQuestion
@@ -212,6 +283,15 @@ export default function QuestionGenerator({ boards, userProfile }: QuestionGener
 
   const currentSample = questionSamples[formData.questionType as keyof typeof questionSamples]
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        <span className="ml-2 text-gray-600">Loading curriculum data...</span>
+      </div>
+    )
+  }
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       <div className="lg:col-span-2">
@@ -234,8 +314,11 @@ export default function QuestionGenerator({ boards, userProfile }: QuestionGener
                         <SelectValue placeholder="Select board" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="1">CBSE/NCERT</SelectItem>
-                        <SelectItem value="2">ICSE</SelectItem>
+                        {boards.map((board) => (
+                          <SelectItem key={board.id} value={board.id}>
+                            {board.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -267,14 +350,18 @@ export default function QuestionGenerator({ boards, userProfile }: QuestionGener
                     <Select
                       value={formData.subjectId}
                       onValueChange={(value) => updateFormData("subjectId", value)}
-                      disabled={!formData.boardId}
+                      disabled={!formData.boardId || !formData.grade}
                     >
                       <SelectTrigger className="h-10">
-                        <SelectValue placeholder="Select Subject" />
+                        <SelectValue
+                          placeholder={
+                            !formData.boardId || !formData.grade ? "Select board and grade first" : "Select Subject"
+                          }
+                        />
                       </SelectTrigger>
                       <SelectContent>
-                        {availableSubjects.map((subject) => (
-                          <SelectItem key={subject.id} value={subject.id.toString()}>
+                        {subjects.map((subject) => (
+                          <SelectItem key={subject.id} value={subject.id}>
                             {subject.name}
                           </SelectItem>
                         ))}
@@ -292,11 +379,13 @@ export default function QuestionGenerator({ boards, userProfile }: QuestionGener
                       disabled={!formData.subjectId}
                     >
                       <SelectTrigger className="h-10">
-                        <SelectValue placeholder="Select Topic/Chapter" />
+                        <SelectValue
+                          placeholder={!formData.subjectId ? "Select subject first" : "Select Topic/Chapter"}
+                        />
                       </SelectTrigger>
                       <SelectContent>
-                        {availableTopics.map((topic) => (
-                          <SelectItem key={topic.id} value={topic.id.toString()}>
+                        {topics.map((topic) => (
+                          <SelectItem key={topic.id} value={topic.id}>
                             {topic.name}
                           </SelectItem>
                         ))}
@@ -523,7 +612,7 @@ export default function QuestionGenerator({ boards, userProfile }: QuestionGener
                               strokeLinecap="round"
                               strokeLinejoin="round"
                               strokeWidth={2}
-                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3-3m0 0l-3 3m3-3v12"
                             />
                           </svg>
                         </Button>
