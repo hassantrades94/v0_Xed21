@@ -3,6 +3,8 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
+import { sendVerificationEmail } from "@/lib/email"
+import { randomBytes } from "crypto"
 
 export async function signIn(prevState: any, formData: FormData) {
   const email = formData.get("email") as string
@@ -57,6 +59,9 @@ export async function signUp(prevState: any, formData: FormData) {
   const supabase = createClient()
 
   try {
+    const verificationToken = randomBytes(32).toString("hex")
+    const tokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -81,8 +86,11 @@ export async function signUp(prevState: any, formData: FormData) {
       organization: organization || null,
       phone: phone || null,
       role: "educator",
-      wallet_balance: 100,
+      wallet_balance: 0, // Start with 0, award 500 on verification
       is_active: true,
+      email_verified: false,
+      verification_token: verificationToken,
+      verification_token_expires: tokenExpiry.toISOString(),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
@@ -93,7 +101,16 @@ export async function signUp(prevState: any, formData: FormData) {
       return { error: "Database error saving new user" }
     }
 
-    return { success: "Account created successfully! Check your email to confirm your account before signing in." }
+    try {
+      await sendVerificationEmail(email, verificationToken)
+    } catch (emailError) {
+      console.error("Email sending error:", emailError)
+      // Don't fail signup if email fails, but log it
+    }
+
+    return {
+      success: "Account created successfully! Check your email to verify your account and claim your 500 free coins.",
+    }
   } catch (error) {
     console.error("Signup error:", error)
     return { error: "An unexpected error occurred" }
@@ -150,4 +167,56 @@ export async function getAdmin() {
   const { data: admin } = await supabase.from("admin_users").select("*").eq("id", user.id).single()
 
   return admin
+}
+
+export async function verifyEmail(token: string) {
+  const supabase = createClient()
+
+  try {
+    // Find user with matching verification token
+    const { data: user, error: userError } = await supabase
+      .from("users")
+      .select("*")
+      .eq("verification_token", token)
+      .gt("verification_token_expires", new Date().toISOString())
+      .single()
+
+    if (userError || !user) {
+      return { success: false, error: "Invalid or expired verification token" }
+    }
+
+    if (user.email_verified) {
+      return { success: false, error: "Email already verified" }
+    }
+
+    // Update user as verified and award 500 coins
+    const { error: updateError } = await supabase
+      .from("users")
+      .update({
+        email_verified: true,
+        wallet_balance: user.wallet_balance + 500,
+        verification_token: null,
+        verification_token_expires: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", user.id)
+
+    if (updateError) {
+      return { success: false, error: "Failed to verify email" }
+    }
+
+    // Record the coin transaction
+    await supabase.from("transactions").insert({
+      user_id: user.id,
+      type: "credit",
+      amount: 500,
+      description: "Email verification bonus",
+      created_at: new Date().toISOString(),
+    })
+
+    return { success: true }
+  } catch (error) {
+    console.error("Email verification error:", error)
+    return { success: false, error: "An unexpected error occurred" }
+  }
 }

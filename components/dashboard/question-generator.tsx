@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Loader2, Zap, Coins } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { Loader2, Zap, Coins, Eye, EyeOff } from "lucide-react"
 import { generateQuestions } from "@/lib/actions/questions"
 import { toast } from "@/components/ui/sonner"
 
@@ -124,6 +125,7 @@ export default function QuestionGenerator({ boards, userProfile }: QuestionGener
   const [isPending, startTransition] = useTransition()
   const [generatedQuestions, setGeneratedQuestions] = useState<any[]>([])
   const [showGenerated, setShowGenerated] = useState(false)
+  const [showConfidence, setShowConfidence] = useState(true)
 
   const selectedBoard = boards.find((b) => b.id.toString() === formData.boardId)
   const availableSubjects = selectedBoard?.subjects || []
@@ -149,7 +151,7 @@ export default function QuestionGenerator({ boards, userProfile }: QuestionGener
     formDataObj.append("topic_id", formData.topicId)
     formDataObj.append("learning_outcome", formData.learningOutcome)
     formDataObj.append("question_type", formData.questionType)
-    formDataObj.append("bloom_taxonomy", formData.bloomTaxonomy)
+    formDataObj.append("bloom_level", formData.bloomTaxonomy)
     formDataObj.append("count", formData.questionCount)
 
     startTransition(async () => {
@@ -162,7 +164,9 @@ export default function QuestionGenerator({ boards, userProfile }: QuestionGener
           type: formData.questionType,
           question: `A team of students conducted an experiment by placing a bar magnet over iron filings spread on a sheet of paper. They observed that most filings gathered at specific parts of the magnet. Based on the diagram showing the distribution of iron filings, explain where the magnetic force is strongest on the bar magnet.`,
           options: ["A) At both ends", "B) At the center", "C) On the sides", "D) Evenly distributed"],
-          key: "A",
+          correct_answer: "A",
+          explanation:
+            "The magnetic force is strongest at the poles, which are located at both ends of the magnet. This is where the magnetic field lines are most concentrated.",
           explanations: [
             {
               option: "A",
@@ -172,8 +176,11 @@ export default function QuestionGenerator({ boards, userProfile }: QuestionGener
             { option: "C", text: "Incorrect. The sides do not exhibit the strongest magnetic force." },
             { option: "D", text: "Incorrect. The magnetic force is not evenly distributed across the magnet." },
           ],
-          bloomLevel: formData.bloomTaxonomy,
-          confidence: 85,
+          bloom_level: formData.bloomTaxonomy,
+          confidence_score: Math.floor(Math.random() * 15) + 80, // 80-95
+          difficulty_indicator: "Medium",
+          estimated_time: 2,
+          marks: 1,
         }))
 
         setGeneratedQuestions(mockQuestions)
@@ -196,7 +203,6 @@ export default function QuestionGenerator({ boards, userProfile }: QuestionGener
   const updateFormData = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
 
-    // Reset dependent fields
     if (field === "boardId") {
       setFormData((prev) => ({ ...prev, subjectId: "", topicId: "" }))
     } else if (field === "subjectId") {
@@ -208,7 +214,6 @@ export default function QuestionGenerator({ boards, userProfile }: QuestionGener
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      {/* Left Column - Form */}
       <div className="lg:col-span-2">
         <div className="bg-white rounded-lg shadow-sm border p-6">
           {!showGenerated ? (
@@ -219,8 +224,6 @@ export default function QuestionGenerator({ boards, userProfile }: QuestionGener
               </div>
 
               <form onSubmit={handleGenerate} className="space-y-6">
-                {/* ... existing form code ... */}
-                {/* Board and Grade */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="board" className="text-sm font-medium text-gray-700">
@@ -256,7 +259,6 @@ export default function QuestionGenerator({ boards, userProfile }: QuestionGener
                   </div>
                 </div>
 
-                {/* Subject and Topic */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="subject" className="text-sm font-medium text-gray-700">
@@ -303,7 +305,6 @@ export default function QuestionGenerator({ boards, userProfile }: QuestionGener
                   </div>
                 </div>
 
-                {/* Learning Outcome */}
                 <div className="space-y-2">
                   <Label htmlFor="learningOutcome" className="text-sm font-medium text-gray-700">
                     Learning Outcome/Standard (Optional)
@@ -322,7 +323,6 @@ export default function QuestionGenerator({ boards, userProfile }: QuestionGener
                   </p>
                 </div>
 
-                {/* Question Type and Bloom's Taxonomy */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="questionType" className="text-sm font-medium text-gray-700">
@@ -367,7 +367,6 @@ export default function QuestionGenerator({ boards, userProfile }: QuestionGener
                   </div>
                 </div>
 
-                {/* Number of Questions */}
                 <div className="space-y-2">
                   <Label htmlFor="questionCount" className="text-sm font-medium text-gray-700">
                     Number of Questions <span className="text-red-500">*</span>
@@ -388,7 +387,6 @@ export default function QuestionGenerator({ boards, userProfile }: QuestionGener
                   </Select>
                 </div>
 
-                {/* Sample Preview - Dynamic based on question type */}
                 <div className="bg-gray-50 rounded-lg p-4">
                   <h3 className="font-medium text-gray-900 mb-3">Sample Preview:</h3>
                   <div className="text-sm text-gray-700">
@@ -430,7 +428,6 @@ export default function QuestionGenerator({ boards, userProfile }: QuestionGener
                   </div>
                 </div>
 
-                {/* Cost and Generate Button */}
                 <div className="bg-blue-50 rounded-lg p-4 flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <Coins className="h-5 w-5 text-blue-600" />
@@ -468,6 +465,13 @@ export default function QuestionGenerator({ boards, userProfile }: QuestionGener
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-semibold text-gray-900">Generated Questions</h2>
                 <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-2">
+                    <Label htmlFor="confidence-toggle" className="text-sm text-gray-600">
+                      {showConfidence ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                    </Label>
+                    <Switch id="confidence-toggle" checked={showConfidence} onCheckedChange={setShowConfidence} />
+                    <span className="text-sm text-gray-600">Confidence</span>
+                  </div>
                   <Button variant="outline" className="text-sm bg-transparent">
                     <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
@@ -502,7 +506,15 @@ export default function QuestionGenerator({ boards, userProfile }: QuestionGener
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center space-x-3">
                         <span className="text-blue-600 font-medium">Question {question.id}</span>
-                        <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">Multiple Choice</span>
+                        <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
+                          {questionTypes[question.type as keyof typeof questionTypes]}
+                        </span>
+                        <span className="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded">
+                          {question.difficulty_indicator}
+                        </span>
+                        <span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded">
+                          {question.estimated_time} min
+                        </span>
                       </div>
                       <div className="flex items-center space-x-2">
                         <Button variant="ghost" size="sm">
@@ -539,18 +551,24 @@ export default function QuestionGenerator({ boards, userProfile }: QuestionGener
 
                     <div className="space-y-2 mb-4">
                       {question.options.map((option: string, index: number) => (
-                        <p key={index} className="text-gray-700">
+                        <p
+                          key={index}
+                          className={`text-gray-700 ${option.startsWith(question.correct_answer) ? "bg-green-50 p-2 rounded" : ""}`}
+                        >
                           {option}
                         </p>
                       ))}
                     </div>
 
                     <div className="bg-green-50 p-3 rounded mb-4">
-                      <p className="text-green-800 font-medium">Key: {question.key}</p>
+                      <p className="text-green-800 font-medium">Key: {question.correct_answer}</p>
                     </div>
 
                     <div className="bg-blue-50 p-3 rounded mb-4">
-                      <p className="text-blue-800 font-medium mb-2">Explanations:</p>
+                      <p className="text-blue-800 font-medium mb-2">Main Explanation:</p>
+                      <p className="text-blue-700 text-sm mb-3">{question.explanation}</p>
+
+                      <p className="text-blue-800 font-medium mb-2">Option Explanations:</p>
                       <div className="space-y-1 text-sm">
                         {question.explanations.map((exp: any, index: number) => (
                           <p key={index} className="text-blue-700">
@@ -561,17 +579,26 @@ export default function QuestionGenerator({ boards, userProfile }: QuestionGener
                     </div>
 
                     <div className="flex items-center justify-between text-sm text-gray-600">
-                      <span>Bloom's Level: {question.bloomLevel}</span>
-                      <div className="flex items-center space-x-2">
-                        <span>Confidence:</span>
-                        <div className="w-20 bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-blue-600 h-2 rounded-full"
-                            style={{ width: `${question.confidence}%` }}
-                          ></div>
-                        </div>
-                        <span>{question.confidence}%</span>
+                      <div className="flex items-center space-x-4">
+                        <span>
+                          Bloom's Level: <span className="font-medium">{question.bloom_level}</span>
+                        </span>
+                        <span>
+                          Marks: <span className="font-medium">{question.marks}</span>
+                        </span>
                       </div>
+                      {showConfidence && (
+                        <div className="flex items-center space-x-2">
+                          <span>Confidence:</span>
+                          <div className="w-20 bg-gray-200 rounded-full h-2">
+                            <div
+                              className="bg-blue-600 h-2 rounded-full"
+                              style={{ width: `${question.confidence_score}%` }}
+                            ></div>
+                          </div>
+                          <span>{question.confidence_score}%</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -581,14 +608,11 @@ export default function QuestionGenerator({ boards, userProfile }: QuestionGener
         </div>
       </div>
 
-      {/* Right Column - Question Type Samples (only show when not generated) */}
       {!showGenerated && (
         <div className="space-y-6">
-          {/* ... existing question type samples code ... */}
           <div className="bg-white rounded-lg shadow-sm border p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Question Type Samples</h3>
 
-            {/* Multiple Choice Single */}
             <div className="mb-6">
               <h4 className="text-blue-600 font-medium mb-2">Multiple Choice (Single correct)</h4>
               <p className="text-sm text-gray-600 mb-3">Select one correct answer from multiple options</p>
@@ -619,7 +643,6 @@ export default function QuestionGenerator({ boards, userProfile }: QuestionGener
               </div>
             </div>
 
-            {/* Multiple Select */}
             <div className="mb-6">
               <h4 className="text-blue-600 font-medium mb-2">Multiple Select (More than one correct answer)</h4>
               <p className="text-sm text-gray-600 mb-3">
@@ -660,7 +683,6 @@ export default function QuestionGenerator({ boards, userProfile }: QuestionGener
               </div>
             </div>
 
-            {/* Fill in the Blanks */}
             <div className="mb-6">
               <h4 className="text-blue-600 font-medium mb-2">Fill in the Blanks</h4>
               <p className="text-sm text-gray-600 mb-3">Complete the sentence with appropriate words</p>
@@ -677,7 +699,6 @@ export default function QuestionGenerator({ boards, userProfile }: QuestionGener
               </div>
             </div>
 
-            {/* In-Line Choice */}
             <div className="mb-6">
               <h4 className="text-blue-600 font-medium mb-2">In-Line Choice</h4>
               <p className="text-sm text-gray-600 mb-3">Select the correct option within the sentence</p>
@@ -694,7 +715,6 @@ export default function QuestionGenerator({ boards, userProfile }: QuestionGener
               </div>
             </div>
 
-            {/* Matching */}
             <div className="mb-6">
               <h4 className="text-blue-600 font-medium mb-2">Matching</h4>
               <p className="text-sm text-gray-600 mb-3">Match items from two columns</p>
@@ -714,7 +734,6 @@ export default function QuestionGenerator({ boards, userProfile }: QuestionGener
               </div>
             </div>
 
-            {/* True/False */}
             <div>
               <h4 className="text-blue-600 font-medium mb-2">True/False</h4>
               <p className="text-sm text-gray-600 mb-3">Determine if the statement is correct</p>

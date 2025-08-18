@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, CheckCircle, AlertCircle } from "lucide-react"
+import { Loader2, CheckCircle, AlertCircle, Gift } from "lucide-react"
 import Link from "next/link"
 import { signUp } from "@/lib/actions/auth"
 
@@ -20,6 +20,14 @@ export default function SignUpForm() {
           <p className="text-center text-muted-foreground">Create your account to get started</p>
         </CardHeader>
         <CardContent>
+          <div className="mb-6 p-4 bg-gradient-to-r from-cyan-50 to-emerald-50 border border-cyan-200 rounded-lg">
+            <div className="flex items-center justify-center space-x-2 text-cyan-700">
+              <Gift className="h-5 w-5" />
+              <span className="font-semibold">🎉 Get 500 Free Coins on Email Verification!</span>
+            </div>
+            <p className="text-center text-sm text-cyan-600 mt-1">Verify your email to start generating questions</p>
+          </div>
+
           <form action={formAction} className="space-y-6">
             {state?.error && (
               <Alert className="border-red-200 bg-red-50 text-red-800">
@@ -35,7 +43,7 @@ export default function SignUpForm() {
               </Alert>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="fullName">Full Name *</Label>
                 <Input
@@ -59,39 +67,38 @@ export default function SignUpForm() {
                   disabled={isPending}
                 />
               </div>
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Password *</Label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                placeholder="Create a strong password"
-                required
-                disabled={isPending}
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="organization">Organization</Label>
+                <Label htmlFor="phone">Phone Number *</Label>
                 <Input
-                  id="organization"
-                  name="organization"
-                  type="text"
-                  placeholder="School/Institution name"
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  placeholder="+91 98765 43210"
+                  defaultValue="+91 "
+                  required
                   disabled={isPending}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
-                <Input id="phone" name="phone" type="tel" placeholder="+1 (555) 123-4567" disabled={isPending} />
+                <Label htmlFor="password">Password *</Label>
+                <Input
+                  id="password"
+                  name="password"
+                  type="password"
+                  placeholder="Create a strong password"
+                  required
+                  disabled={isPending}
+                />
               </div>
             </div>
 
-            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white" disabled={isPending}>
+            <Button
+              type="submit"
+              className="w-full bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-700 hover:to-emerald-700 text-white"
+              disabled={isPending}
+            >
               {isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -102,18 +109,22 @@ export default function SignUpForm() {
               )}
             </Button>
 
-            <div className="text-center text-sm text-muted-foreground">
-              Already have an account?{" "}
-              <Link href="/auth/login" className="text-blue-600 hover:underline">
-                Sign in here
+            <div className="text-center text-xs text-muted-foreground">
+              By signing up, you agree to our{" "}
+              <Link href="/terms" className="text-cyan-600 hover:underline">
+                Terms of Service
+              </Link>{" "}
+              and{" "}
+              <Link href="/privacy" className="text-cyan-600 hover:underline">
+                Privacy Policy
               </Link>
             </div>
 
             <div className="text-center text-sm text-muted-foreground">
-              Need help?{" "}
-              <a href="mailto:support@xed21.com" className="text-blue-600 hover:underline">
-                Contact Support
-              </a>
+              Already have an account?{" "}
+              <Link href="/auth/login" className="text-cyan-600 hover:underline">
+                Sign in here
+              </Link>
             </div>
           </form>
         </CardContent>
