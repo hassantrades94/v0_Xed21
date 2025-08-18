@@ -59,15 +59,23 @@ export async function signUp(prevState: any, formData: FormData) {
   const supabase = createClient()
 
   try {
+    // First check if user already exists
+    const { data: existingUser } = await supabase.from("users").select("id").eq("email", email).single()
+
+    if (existingUser) {
+      return { error: "An account with this email already exists" }
+    }
+
     const verificationToken = randomBytes(32).toString("hex")
     const tokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
 
+    // Create auth user first
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
       options: {
         emailRedirectTo:
-          process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard`,
+          process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
       },
     })
 
@@ -79,11 +87,11 @@ export async function signUp(prevState: any, formData: FormData) {
       return { error: "Failed to create user account" }
     }
 
+    // Create user profile in database
     const { error: dbError } = await supabase.from("users").insert({
       id: authData.user.id,
       email: email,
       full_name: fullName,
-      organization: organization || null,
       phone: phone || null,
       role: "educator",
       wallet_balance: 0, // Start with 0, award 500 on verification
@@ -97,10 +105,16 @@ export async function signUp(prevState: any, formData: FormData) {
 
     if (dbError) {
       console.error("Database error:", dbError)
-      await supabase.auth.admin.deleteUser(authData.user.id)
-      return { error: "Database error saving new user" }
+      // Clean up auth user if database insert fails
+      try {
+        await supabase.auth.admin.deleteUser(authData.user.id)
+      } catch (cleanupError) {
+        console.error("Failed to cleanup auth user:", cleanupError)
+      }
+      return { error: "Failed to create user profile. Please try again." }
     }
 
+    // Send verification email
     try {
       await sendVerificationEmail(email, verificationToken)
     } catch (emailError) {
@@ -113,7 +127,7 @@ export async function signUp(prevState: any, formData: FormData) {
     }
   } catch (error) {
     console.error("Signup error:", error)
-    return { error: "An unexpected error occurred" }
+    return { error: "An unexpected error occurred during signup" }
   }
 }
 

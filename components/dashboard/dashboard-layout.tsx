@@ -1,12 +1,12 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Wallet, Coins, X, CreditCard, History, Clock } from "lucide-react"
-import { supabase } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/client"
 import QuestionHistoryModal from "./question-history-modal"
 
 interface DashboardLayoutProps {
@@ -21,8 +21,56 @@ export default function DashboardLayout({ children, user, userProfile }: Dashboa
   const [activityModalOpen, setActivityModalOpen] = useState(false)
   const [walletTab, setWalletTab] = useState<"recharge" | "history">("recharge")
   const [customAmount, setCustomAmount] = useState("500")
+  const [realUserData, setRealUserData] = useState<any>(null)
+  const [transactions, setTransactions] = useState<any[]>([])
   const pathname = usePathname()
   const router = useRouter()
+
+  const supabase = createClient()
+
+  useEffect(() => {
+    loadUserData()
+    loadTransactions()
+  }, [])
+
+  const loadUserData = async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profile } = await supabase.from("users").select("*").eq("id", user.id).single()
+
+        if (profile) {
+          setRealUserData(profile)
+        }
+      }
+    } catch (error) {
+      console.error("Error loading user data:", error)
+    }
+  }
+
+  const loadTransactions = async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user) {
+        const { data } = await supabase
+          .from("transactions")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(5)
+
+        if (data) {
+          setTransactions(data)
+        }
+      }
+    } catch (error) {
+      console.error("Error loading transactions:", error)
+    }
+  }
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -38,24 +86,17 @@ export default function DashboardLayout({ children, user, userProfile }: Dashboa
       .slice(0, 2)
   }
 
-  const mockUser = {
-    name: "Mamun",
-    email: "geology.cupb16@gmail.com",
-    balance: 9500,
-  }
+  const displayUser = realUserData ||
+    userProfile || {
+      full_name: "Mamun",
+      email: "geology.cupb16@gmail.com",
+      wallet_balance: 9500,
+    }
 
   const rechargePackages = [
     { amount: 100, coins: 200, bonus: 0 },
     { amount: 500, coins: 1100, bonus: 100, popular: true },
     { amount: 1000, coins: 2300, bonus: 300 },
-  ]
-
-  const transactionHistory = [
-    { id: 1, description: "Generated 5 understanding questions", date: "15/08/2025", coins: -35 },
-    { id: 2, description: "Generated 5 creating questions", date: "13/08/2025", coins: -125 },
-    { id: 3, description: "Generated 5 evaluating questions", date: "13/08/2025", coins: -125 },
-    { id: 4, description: "Generated 5 analyzing questions", date: "13/08/2025", coins: -75 },
-    { id: 5, description: "Generated 5 analyzing questions", date: "13/08/2025", coins: -75 },
   ]
 
   const calculateCoins = (amount: number) => {
@@ -82,7 +123,7 @@ export default function DashboardLayout({ children, user, userProfile }: Dashboa
               {/* Coins Display */}
               <div className="flex items-center space-x-2 bg-white/10 rounded-full px-4 py-2">
                 <Coins className="h-4 w-4 text-yellow-300" />
-                <span className="text-white font-medium">{mockUser.balance}</span>
+                <span className="text-white font-medium">{displayUser.wallet_balance || 0}</span>
                 <span className="text-white/80 text-sm">coins</span>
               </div>
 
@@ -107,12 +148,12 @@ export default function DashboardLayout({ children, user, userProfile }: Dashboa
               <div className="flex items-center space-x-3">
                 <Avatar className="h-8 w-8">
                   <AvatarFallback className="bg-blue-800 text-white text-sm">
-                    {getUserInitials(mockUser.name)}
+                    {getUserInitials(displayUser.full_name || displayUser.name || "User")}
                   </AvatarFallback>
                 </Avatar>
                 <div className="text-white">
-                  <div className="text-sm font-medium">{mockUser.name}</div>
-                  <div className="text-xs text-white/80">{mockUser.email}</div>
+                  <div className="text-sm font-medium">{displayUser.full_name || displayUser.name}</div>
+                  <div className="text-xs text-white/80">{displayUser.email}</div>
                 </div>
               </div>
             </div>
@@ -173,7 +214,7 @@ export default function DashboardLayout({ children, user, userProfile }: Dashboa
                     <div className="flex items-center justify-between">
                       <div>
                         <h3 className="text-lg font-semibold text-yellow-800">Current Balance</h3>
-                        <p className="text-3xl font-bold text-yellow-900">{mockUser.balance} coins</p>
+                        <p className="text-3xl font-bold text-yellow-900">{displayUser.wallet_balance || 0} coins</p>
                       </div>
                       <Coins className="h-12 w-12 text-yellow-600" />
                     </div>
@@ -256,23 +297,38 @@ export default function DashboardLayout({ children, user, userProfile }: Dashboa
                 <div>
                   <h3 className="text-lg font-semibold mb-4">Transaction History</h3>
                   <div className="space-y-3">
-                    {transactionHistory.map((transaction) => (
-                      <div key={transaction.id} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="flex items-center space-x-3">
-                          <div className="p-2 bg-red-100 rounded-full">
-                            <Coins className="h-4 w-4 text-red-600" />
+                    {transactions.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <p>No transactions found</p>
+                      </div>
+                    ) : (
+                      transactions.map((transaction) => (
+                        <div key={transaction.id} className="flex items-center justify-between p-4 border rounded-lg">
+                          <div className="flex items-center space-x-3">
+                            <div
+                              className={`p-2 rounded-full ${transaction.type === "credit" ? "bg-green-100" : "bg-red-100"}`}
+                            >
+                              <Coins
+                                className={`h-4 w-4 ${transaction.type === "credit" ? "text-green-600" : "text-red-600"}`}
+                              />
+                            </div>
+                            <div>
+                              <p className="font-medium">{transaction.description}</p>
+                              <p className="text-sm text-gray-500 flex items-center">
+                                <Clock className="h-3 w-3 mr-1" />
+                                {new Date(transaction.created_at).toLocaleDateString()}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="font-medium">{transaction.description}</p>
-                            <p className="text-sm text-gray-500 flex items-center">
-                              <Clock className="h-3 w-3 mr-1" />
-                              {transaction.date}
-                            </p>
+                          <div
+                            className={`font-semibold ${transaction.type === "credit" ? "text-green-600" : "text-red-600"}`}
+                          >
+                            {transaction.type === "credit" ? "+" : "-"}
+                            {transaction.amount} coins
                           </div>
                         </div>
-                        <div className="text-red-600 font-semibold">{transaction.coins} coins</div>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
                 </div>
               )}
