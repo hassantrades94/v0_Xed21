@@ -457,3 +457,58 @@ export async function rejectQuestion(questionId: string, reason?: string) {
   revalidatePath("/admin/questions")
   return { success: true }
 }
+
+export async function getBoards() {
+  const supabase = createClient()
+  const { data, error } = await supabase.from("boards").select(`
+    id,
+    name
+  `)
+  if (error) {
+    console.error("Error fetching boards:", error)
+    return []
+  }
+  return data
+}
+
+export async function getSubjectsByBoard(boardId: string, gradeLevel: number) {
+  const supabase = createClient()
+  const { data, error } = await supabase.from("subjects").select(`
+    id,
+    name
+  `).eq("board_id", boardId).eq("grade_level", gradeLevel)
+  if (error) {
+    console.error("Error fetching subjects:", error)
+    return []
+  }
+  return data
+}
+
+export async function getTopicsBySubject(subjectId: string, boardId: string, gradeLevel: number) {
+  const supabase = createClient()
+
+  // First, verify the subject exists for the given board and grade
+  const { data: subjectData, error: subjectError } = await supabase
+    .from("subjects")
+    .select("id")
+    .eq("id", subjectId)
+    .eq("board_id", boardId)
+    .eq("grade_level", gradeLevel)
+    .single()
+
+  if (subjectError || !subjectData) {
+    console.error("Error verifying subject or subject not found:", subjectError)
+    return []
+  }
+
+  // Then, fetch topics for that subject
+  const { data, error } = await supabase.from("topics").select(`
+    id,
+    name
+  `).eq("subject_id", subjectId)
+  if (error) {
+    console.error("Error fetching topics:", error)
+    return []
+  }
+  return data
+}

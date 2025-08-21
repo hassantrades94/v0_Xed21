@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Wallet, Coins, X, CreditCard, History, Clock } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+import { supabase } from "@/lib/supabase/client"
 import QuestionHistoryModal from "./question-history-modal"
 
 interface DashboardLayoutProps {
@@ -26,7 +26,7 @@ export default function DashboardLayout({ children, user, userProfile }: Dashboa
   const pathname = usePathname()
   const router = useRouter()
 
-  const supabase = createClient()
+  const supabaseClient = supabase
 
   useEffect(() => {
     loadUserData()

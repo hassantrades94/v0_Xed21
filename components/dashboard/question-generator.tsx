@@ -8,12 +8,12 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Loader2, Zap, Coins, Eye, EyeOff } from "lucide-react"
-import { generateQuestions } from "@/lib/actions/questions"
+import { generateQuestions, getSubjectsByBoard, getTopicsBySubject } from "@/lib/actions/questions"
 import { toast } from "@/components/ui/sonner"
-import { createClient } from "@/lib/supabase/client"
 
 interface QuestionGeneratorProps {
   userProfile: any
+  boards: any[]
 }
 
 const bloomLevels = {
@@ -110,7 +110,7 @@ const questionSamples = {
   },
 }
 
-export default function QuestionGenerator({ userProfile }: QuestionGeneratorProps) {
+export default function QuestionGenerator({ userProfile, boards: initialBoards }: QuestionGeneratorProps) {
   const [formData, setFormData] = useState({
     boardId: "",
     grade: "",
@@ -126,20 +126,25 @@ export default function QuestionGenerator({ userProfile }: QuestionGeneratorProp
   const [showGenerated, setShowGenerated] = useState(false)
   const [showConfidence, setShowConfidence] = useState(true)
 
-  const [boards, setBoards] = useState<any[]>([])
   const [subjects, setSubjects] = useState<any[]>([])
   const [topics, setTopics] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-
-  const supabase = createClient()
-
-  useEffect(() => {
-    loadBoards()
-  }, [])
+  const [loadingSubjects, setLoadingSubjects] = useState(false)
+  const [loadingTopics, setLoadingTopics] = useState(false)
 
   useEffect(() => {
     if (formData.boardId && formData.grade) {
-      loadSubjects(formData.boardId, Number.parseInt(formData.grade))
+      setLoadingSubjects(true)
+      getSubjectsByBoard(formData.boardId, Number.parseInt(formData.grade))
+        .then((data) => {
+          setSubjects(data || [])
+        })
+        .catch((error) => {
+          console.error("Error loading subjects:", error)
+          toast.error("Failed to load subjects")
+        })
+        .finally(() => {
+          setLoadingSubjects(false)
+        })
     } else {
       setSubjects([])
       setTopics([])
@@ -148,60 +153,22 @@ export default function QuestionGenerator({ userProfile }: QuestionGeneratorProp
 
   useEffect(() => {
     if (formData.subjectId) {
-      loadTopics(formData.subjectId)
+      setLoadingTopics(true)
+      getTopicsBySubject(formData.subjectId, formData.boardId, Number.parseInt(formData.grade))
+        .then((data) => {
+          setTopics(data || [])
+        })
+        .catch((error) => {
+          console.error("Error loading topics:", error)
+          toast.error("Failed to load topics")
+        })
+        .finally(() => {
+          setLoadingTopics(false)
+        })
     } else {
       setTopics([])
     }
   }, [formData.subjectId])
-
-  const loadBoards = async () => {
-    try {
-      const { data, error } = await supabase.from("boards").select("*").eq("is_active", true).order("name")
-
-      if (error) throw error
-      setBoards(data || [])
-    } catch (error) {
-      console.error("Error loading boards:", error)
-      toast.error("Failed to load boards")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const loadSubjects = async (boardId: string, gradeLevel: number) => {
-    try {
-      const { data, error } = await supabase
-        .from("subjects")
-        .select("*")
-        .eq("board_id", boardId)
-        .eq("grade_level", gradeLevel)
-        .eq("is_active", true)
-        .order("name")
-
-      if (error) throw error
-      setSubjects(data || [])
-    } catch (error) {
-      console.error("Error loading subjects:", error)
-      toast.error("Failed to load subjects")
-    }
-  }
-
-  const loadTopics = async (subjectId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from("topics")
-        .select("*")
-        .eq("subject_id", subjectId)
-        .eq("is_active", true)
-        .order("order_index", { ascending: true })
-
-      if (error) throw error
-      setTopics(data || [])
-    } catch (error) {
-      console.error("Error loading topics:", error)
-      toast.error("Failed to load topics")
-    }
-  }
 
   const costPerQuestion = bloomLevels[formData.bloomTaxonomy as keyof typeof bloomLevels]?.coins || 7
   const totalCost = Number.parseInt(formData.questionCount || "0") * costPerQuestion
@@ -283,15 +250,6 @@ export default function QuestionGenerator({ userProfile }: QuestionGeneratorProp
 
   const currentSample = questionSamples[formData.questionType as keyof typeof questionSamples]
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-        <span className="ml-2 text-gray-600">Loading curriculum data...</span>
-      </div>
-    )
-  }
-
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       <div className="lg:col-span-2">
@@ -314,7 +272,7 @@ export default function QuestionGenerator({ userProfile }: QuestionGeneratorProp
                         <SelectValue placeholder="Select board" />
                       </SelectTrigger>
                       <SelectContent>
-                        {boards.map((board) => (
+                        {initialBoards.map((board) => (
                           <SelectItem key={board.id} value={board.id}>
                             {board.name}
                           </SelectItem>
@@ -350,12 +308,16 @@ export default function QuestionGenerator({ userProfile }: QuestionGeneratorProp
                     <Select
                       value={formData.subjectId}
                       onValueChange={(value) => updateFormData("subjectId", value)}
-                      disabled={!formData.boardId || !formData.grade}
+                      disabled={!formData.boardId || !formData.grade || loadingSubjects}
                     >
                       <SelectTrigger className="h-10">
                         <SelectValue
                           placeholder={
-                            !formData.boardId || !formData.grade ? "Select board and grade first" : "Select Subject"
+                            !formData.boardId || !formData.grade
+                              ? "Select board and grade first"
+                              : loadingSubjects
+                                ? "Loading subjects..."
+                                : "Select Subject"
                           }
                         />
                       </SelectTrigger>
@@ -376,11 +338,17 @@ export default function QuestionGenerator({ userProfile }: QuestionGeneratorProp
                     <Select
                       value={formData.topicId}
                       onValueChange={(value) => updateFormData("topicId", value)}
-                      disabled={!formData.subjectId}
+                      disabled={!formData.subjectId || loadingTopics}
                     >
                       <SelectTrigger className="h-10">
                         <SelectValue
-                          placeholder={!formData.subjectId ? "Select subject first" : "Select Topic/Chapter"}
+                          placeholder={
+                            !formData.subjectId
+                              ? "Select subject first"
+                              : loadingTopics
+                                ? "Loading topics..."
+                                : "Select Topic/Chapter"
+                          }
                         />
                       </SelectTrigger>
                       <SelectContent>
