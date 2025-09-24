@@ -1,30 +1,9 @@
-import { 
-  updateUserWalletBalance, 
-  suspendUserAccount, 
-  deleteUserAccount,
-  getAllUsers,
-  getAdminStats,
-  getAllBoards,
-  createBoard as createBoardDB,
-  updateBoard as updateBoardDB,
-  deleteBoard as deleteBoardDB,
-  getSubjectsByBoardAndGrade,
-  createSubject as createSubjectDB,
-  getTopicsBySubject,
-  createTopic as createTopicDB,
-  getAIRules,
-  updateAIRuleStatus,
-  updateAIRuleContent,
-  getBloomSamples,
-  createBloomSampleDB,
-  updateBloomSampleDB,
-  deleteBloomSampleDB
-} from "@/lib/database/sqlite"
 import { revalidatePath } from "next/cache"
 
 // User management actions
 export async function updateUserCoins(userId: string, newBalance: number) {
   try {
+    const { updateUserWalletBalance } = await import("@/lib/database/sqlite")
     await updateUserWalletBalance(userId, newBalance)
     
     revalidatePath("/admin/users")
@@ -37,6 +16,7 @@ export async function updateUserCoins(userId: string, newBalance: number) {
 
 export async function suspendUser(userId: string) {
   try {
+    const { suspendUserAccount } = await import("@/lib/database/sqlite")
     await suspendUserAccount(userId)
     
     revalidatePath("/admin/users")
@@ -49,6 +29,7 @@ export async function suspendUser(userId: string) {
 
 export async function deleteUser(userId: string) {
   try {
+    const { deleteUserAccount } = await import("@/lib/database/sqlite")
     await deleteUserAccount(userId)
     
     revalidatePath("/admin/users")
@@ -61,6 +42,7 @@ export async function deleteUser(userId: string) {
 
 export async function getUsers() {
   try {
+    const { getAllUsers } = await import("@/lib/database/sqlite")
     return await getAllUsers()
   } catch (error) {
     console.error("Error fetching users:", error)
@@ -70,6 +52,7 @@ export async function getUsers() {
 
 export async function getDashboardStats() {
   try {
+    const { getAdminStats } = await import("@/lib/database/sqlite")
     return await getAdminStats()
   } catch (error) {
     console.error("Error fetching dashboard stats:", error)
@@ -87,6 +70,7 @@ export async function getDashboardStats() {
 // Content management actions
 export async function getBoards() {
   try {
+    const { getAllBoards } = await import("@/lib/database/sqlite")
     return await getAllBoards()
   } catch (error) {
     console.error("Error fetching boards:", error)
@@ -96,6 +80,7 @@ export async function getBoards() {
 
 export async function createBoard(data: { name: string; code: string; description?: string }) {
   try {
+    const { createBoard: createBoardDB } = await import("@/lib/database/sqlite")
     await createBoardDB(data.name, data.code, data.description)
     
     revalidatePath("/admin/content")
@@ -108,6 +93,7 @@ export async function createBoard(data: { name: string; code: string; descriptio
 
 export async function updateBoard(id: string, data: { name: string; code: string; description?: string }) {
   try {
+    const { updateBoard: updateBoardDB } = await import("@/lib/database/sqlite")
     await updateBoardDB(id, data.name, data.code, data.description)
     
     revalidatePath("/admin/content")
@@ -120,6 +106,7 @@ export async function updateBoard(id: string, data: { name: string; code: string
 
 export async function deleteBoard(id: string) {
   try {
+    const { deleteBoard: deleteBoardDB } = await import("@/lib/database/sqlite")
     await deleteBoardDB(id)
     
     revalidatePath("/admin/content")
@@ -132,6 +119,7 @@ export async function deleteBoard(id: string) {
 
 export async function getSubjectsForBoard(boardId: string, grade: number) {
   try {
+    const { getSubjectsByBoardAndGrade } = await import("@/lib/database/sqlite")
     return await getSubjectsByBoardAndGrade(boardId, grade)
   } catch (error) {
     console.error("Error fetching subjects:", error)
@@ -141,6 +129,7 @@ export async function getSubjectsForBoard(boardId: string, grade: number) {
 
 export async function createSubject(data: { name: string; code: string; boardId: string; gradeLevel: number }) {
   try {
+    const { createSubject: createSubjectDB } = await import("@/lib/database/sqlite")
     await createSubjectDB(data.boardId, data.name, data.code, data.gradeLevel)
     
     revalidatePath("/admin/content")
@@ -153,6 +142,7 @@ export async function createSubject(data: { name: string; code: string; boardId:
 
 export async function getTopicsForSubject(subjectId: string) {
   try {
+    const { getTopicsBySubject } = await import("@/lib/database/sqlite")
     return await getTopicsBySubject(subjectId)
   } catch (error) {
     console.error("Error fetching topics:", error)
@@ -162,6 +152,7 @@ export async function getTopicsForSubject(subjectId: string) {
 
 export async function createTopic(data: { name: string; description?: string; subjectId: string }) {
   try {
+    const { createTopic: createTopicDB } = await import("@/lib/database/sqlite")
     await createTopicDB(data.subjectId, data.name, data.description)
     
     revalidatePath("/admin/content")
@@ -175,6 +166,7 @@ export async function createTopic(data: { name: string; description?: string; su
 // AI Rules management
 export async function getAllAIRules() {
   try {
+    const { getAIRules } = await import("@/lib/database/sqlite")
     return await getAIRules()
   } catch (error) {
     console.error("Error fetching AI rules:", error)
@@ -184,6 +176,7 @@ export async function getAllAIRules() {
 
 export async function toggleAIRule(ruleId: string, ruleType: string) {
   try {
+    const { getAIRules, updateAIRuleStatus } = await import("@/lib/database/sqlite")
     const rules = await getAIRules()
     const rule = rules.find((r: any) => r.id === ruleId)
     
@@ -203,6 +196,7 @@ export async function toggleAIRule(ruleId: string, ruleType: string) {
 
 export async function updateAIRule(ruleId: string, ruleType: string, name: string, description: string) {
   try {
+    const { updateAIRuleContent } = await import("@/lib/database/sqlite")
     await updateAIRuleContent(ruleId, name, description)
     
     revalidatePath("/admin/ai-rules")
@@ -216,6 +210,7 @@ export async function updateAIRule(ruleId: string, ruleType: string, name: strin
 // Bloom Samples management
 export async function getAllBloomSamples() {
   try {
+    const { getBloomSamples } = await import("@/lib/database/sqlite")
     return await getBloomSamples()
   } catch (error) {
     console.error("Error fetching bloom samples:", error)
@@ -225,6 +220,7 @@ export async function getAllBloomSamples() {
 
 export async function createBloomSample(bloomLevel: string, grade: string, subject: string, question: string) {
   try {
+    const { createBloomSample: createBloomSampleDB } = await import("@/lib/database/sqlite")
     await createBloomSampleDB(bloomLevel, parseInt(grade), subject, 'mcq', question, `Sample ${bloomLevel} question for Grade ${grade} ${subject}`)
     
     revalidatePath("/admin/bloom-samples")
@@ -237,6 +233,7 @@ export async function createBloomSample(bloomLevel: string, grade: string, subje
 
 export async function updateBloomSample(sampleId: string, bloomLevel: string, grade: string, subject: string, question: string) {
   try {
+    const { updateBloomSample: updateBloomSampleDB } = await import("@/lib/database/sqlite")
     await updateBloomSampleDB(sampleId, bloomLevel, parseInt(grade), subject, 'mcq', question, `Updated ${bloomLevel} question for Grade ${grade} ${subject}`)
     
     revalidatePath("/admin/bloom-samples")
@@ -249,6 +246,7 @@ export async function updateBloomSample(sampleId: string, bloomLevel: string, gr
 
 export async function deleteBloomSample(sampleId: string) {
   try {
+    const { deleteBloomSample: deleteBloomSampleDB } = await import("@/lib/database/sqlite")
     await deleteBloomSampleDB(sampleId)
     
     revalidatePath("/admin/bloom-samples")
