@@ -1,6 +1,15 @@
 "use server"
 
-import { createClient } from "@/lib/supabase/server"
+import { 
+  getAllBoards, 
+  getSubjectsByBoardAndGrade, 
+  getTopicsBySubject,
+  createQuestion,
+  getQuestionsByUser,
+  getUserById,
+  updateUserWalletBalance,
+  createTransaction
+} from "@/lib/database/queries"
 import { generateText } from "ai"
 import { groq } from "@ai-sdk/groq"
 import { openai } from "@ai-sdk/openai"
@@ -460,12 +469,8 @@ export async function rejectQuestion(questionId: string, reason?: string) {
 
 export async function getBoards() {
   try {
-    // Return mock data for Bolt environment
-    return [
-      { id: "cbse", name: "CBSE/NCERT" },
-      { id: "icse", name: "ICSE/CISCE" },
-      { id: "state", name: "State Boards" },
-    ]
+    const boards = getAllBoards()
+    return boards
   } catch (error) {
     console.error("Error in getBoards:", error)
     // Return mock data if any error occurs
@@ -478,62 +483,37 @@ export async function getBoards() {
 }
 
 export async function getSubjectsByBoard(boardId: string, gradeLevel: number) {
-  // Return mock data based on grade level for Bolt environment
-  const subjects = [
-    { id: "science", name: "Science" },
-    { id: "mathematics", name: "Mathematics" },
-    { id: "english", name: "English" },
-    { id: "hindi", name: "Hindi" },
-  ]
-  
-  if (gradeLevel >= 6) {
-    subjects.push({ id: "social-science", name: "Social Science" })
+  try {
+    const subjects = getSubjectsByBoardAndGrade(boardId, gradeLevel)
+    return subjects
+  } catch (error) {
+    console.error("Error in getSubjectsByBoard:", error)
+    // Return mock data if any error occurs
+    const subjects = [
+      { id: "cbse-science-6", name: "Science" },
+      { id: "cbse-math-6", name: "Mathematics" },
+      { id: "cbse-english-6", name: "English" },
+      { id: "cbse-hindi-6", name: "Hindi" },
+      { id: "cbse-sst-6", name: "Social Science" },
+    ]
+    return subjects
   }
-  
-  return subjects
 }
 
 export async function getTopicsBySubject(subjectId: string, boardId: string, gradeLevel: number) {
-  // Return mock topics based on subject for Bolt environment
-  const topicsBySubject: { [key: string]: Array<{ id: string; name: string }> } = {
-    science: [
+  try {
+    const topics = getTopicsBySubject(subjectId)
+    return topics
+  } catch (error) {
+    console.error("Error in getTopicsBySubject:", error)
+    // Return mock data if any error occurs
+    return [
       { id: "exploring-magnets", name: "Exploring Magnets" },
       { id: "light-shadows", name: "Light and Shadows" },
       { id: "motion-measurement", name: "Motion and Measurement" },
       { id: "materials-around-us", name: "Materials Around Us" },
       { id: "living-organisms", name: "Living Organisms and Their Surroundings" },
       { id: "components-food", name: "Components of Food" },
-    ],
-    mathematics: [
-      { id: "knowing-numbers", name: "Knowing Our Numbers" },
-      { id: "whole-numbers", name: "Whole Numbers" },
-      { id: "playing-numbers", name: "Playing with Numbers" },
-      { id: "basic-geometry", name: "Basic Geometrical Ideas" },
-      { id: "fractions", name: "Fractions" },
-      { id: "decimals", name: "Decimals" },
-    ],
-    english: [
-      { id: "reading-comprehension", name: "Reading Comprehension" },
-      { id: "grammar", name: "Grammar" },
-      { id: "writing-skills", name: "Writing Skills" },
-      { id: "literature", name: "Literature" },
-      { id: "poetry", name: "Poetry" },
-    ],
-    hindi: [
-      { id: "hindi-grammar", name: "व्याकरण (Grammar)" },
-      { id: "hindi-literature", name: "साहित्य (Literature)" },
-      { id: "hindi-writing", name: "लेखन (Writing)" },
-      { id: "hindi-poetry", name: "कविता (Poetry)" },
-    ],
-    "social-science": [
-      { id: "history", name: "History" },
-      { id: "geography", name: "Geography" },
-      { id: "civics", name: "Civics" },
-      { id: "economics", name: "Economics" },
-    ],
+    ]
   }
-  
-  return topicsBySubject[subjectId] || [
-    { id: "general-topic", name: "General Topics" },
-  ]
 }
