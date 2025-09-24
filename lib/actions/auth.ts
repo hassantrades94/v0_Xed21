@@ -159,7 +159,12 @@ export async function adminSignIn(prevState: any, formData: FormData) {
 
   // Check hardcoded admin credentials
   if (email === "hassan.jobs07@gmail.com" && password === "Abutaleb@35") {
-    revalidatePath("/", "layout")
+    try {
+      revalidatePath("/", "layout")
+    } catch (error) {
+      // Ignore revalidation errors during static generation
+      console.warn("Revalidation skipped:", error)
+    }
     redirect("/admin/dashboard")
   } else {
     return { error: "Invalid admin credentials" }
