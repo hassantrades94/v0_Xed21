@@ -6,7 +6,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { createBoard, updateBoard, deleteBoard, createSubject, createTopic, getSubjectsForBoard, getTopicsForSubject } from "@/lib/actions/admin"
 import { ChevronDown, ChevronRight, Edit, FileText, Plus, Trash2, X } from "lucide-react"
 
 interface ContentManagementProps {
