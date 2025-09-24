@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache"
 
 export async function updateUserCoins(userId: string, newBalance: number) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     const { error } = await supabase.from("users").update({ wallet_balance: newBalance }).eq("id", userId)
 
@@ -30,7 +30,7 @@ export async function updateUserCoins(userId: string, newBalance: number) {
 
 export async function suspendUser(userId: string) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     const { error } = await supabase.from("users").update({ status: "suspended" }).eq("id", userId)
 
@@ -46,7 +46,7 @@ export async function suspendUser(userId: string) {
 
 export async function deleteUser(userId: string) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     const { error } = await supabase.from("users").delete().eq("id", userId)
 
@@ -62,7 +62,7 @@ export async function deleteUser(userId: string) {
 
 export async function updateContentItem(contentId: string, title: string, content: string) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     const { error } = await supabase
       .from("topics")
@@ -103,7 +103,7 @@ export async function uploadContentFile(formData: FormData) {
 
 export async function toggleAIRule(ruleId: string, ruleType: string) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Get current status
     const { data: currentRule, error: fetchError } = await supabase
@@ -129,7 +129,7 @@ export async function toggleAIRule(ruleId: string, ruleType: string) {
 
 export async function updateAIRule(ruleId: string, ruleType: string, name: string, description: string) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     const { error } = await supabase
       .from("ai_rules")
@@ -152,7 +152,7 @@ export async function updateAIRule(ruleId: string, ruleType: string, name: strin
 
 export async function createBloomSample(bloomLevel: string, grade: string, subject: string, question: string) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     const { error } = await supabase.from("bloom_samples").insert({
       bloom_level: bloomLevel.toLowerCase(),
@@ -181,7 +181,7 @@ export async function updateBloomSample(
   question: string,
 ) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     const { error } = await supabase
       .from("bloom_samples")
@@ -206,7 +206,7 @@ export async function updateBloomSample(
 
 export async function deleteBloomSample(sampleId: string) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     const { error } = await supabase.from("bloom_samples").delete().eq("id", sampleId)
 
@@ -222,7 +222,7 @@ export async function deleteBloomSample(sampleId: string) {
 
 export async function createAIRule(ruleType: string, name: string, description: string, questionType?: string) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     const { error } = await supabase.from("ai_rules").insert({
       rule_type: ruleType,
@@ -244,7 +244,7 @@ export async function createAIRule(ruleType: string, name: string, description: 
 
 export async function deleteAIRule(ruleId: string) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     const { error } = await supabase.from("ai_rules").delete().eq("id", ruleId)
 
