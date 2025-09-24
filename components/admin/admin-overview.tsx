@@ -239,9 +239,9 @@ export default function AdminOverview({ data }: AdminOverviewProps) {
                           {question.question_text?.substring(0, 80)}...
                         </p>
                         <div className="flex items-center space-x-2 mt-1">
-                          <span className="text-xs text-gray-400">{question.users?.full_name || "Unknown User"}</span>
+                          <span className="text-xs text-gray-400">{question.user_name || "Unknown User"}</span>
                           <span className="text-xs text-gray-500">•</span>
-                          <span className="text-xs text-gray-400">{question.topics?.name || "Unknown Topic"}</span>
+                          <span className="text-xs text-gray-400">{question.topic_name || "Unknown Topic"}</span>
                         </div>
                       </div>
                       <Badge
