@@ -1,19 +1,10 @@
-import { createClient } from "@/lib/supabase/server"
-import { redirect } from "next/navigation"
 import SignUpForm from "@/components/auth/signup-form"
 import Link from "next/link"
 import { BookOpen } from "lucide-react"
 
-export default async function SignUpPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  // If user is already logged in, redirect to dashboard
-  if (user) {
-    redirect("/dashboard")
-  }
+export default function SignUpPage() {
+  // Remove Supabase auth check since it's causing issues in Bolt environment
+  // The authentication will be handled by the form submission instead
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center px-4 py-12">

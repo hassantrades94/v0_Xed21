@@ -1,26 +1,10 @@
-import { createClient } from "@/lib/supabase/server"
-import { redirect } from "next/navigation"
 import AdminLoginForm from "@/components/auth/admin-login-form"
 import Link from "next/link"
 import { BookOpen, Shield } from "lucide-react"
 
-export default async function AdminLoginPage() {
-  const supabase = await createClient()
-  
-  let user = null
-  try {
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser()
-    user = authUser
-  } catch (error) {
-    console.warn("Auth check failed:", error)
-  }
-
-  // Check if user is admin (this would need proper role checking in real implementation)
-  if (user) {
-    redirect("/admin/dashboard")
-  }
+export default function AdminLoginPage() {
+  // Remove Supabase auth check since it's causing issues in Bolt environment
+  // The authentication will be handled by the form submission instead
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center px-4 py-12">

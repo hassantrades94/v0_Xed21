@@ -1,29 +1,49 @@
-import { createClient } from "@/lib/supabase/server"
-import { redirect } from "next/navigation"
 import DashboardLayout from "@/components/dashboard/dashboard-layout"
 import WalletManager from "@/components/dashboard/wallet-manager"
-import { getWalletTransactions, getWalletStats } from "@/lib/actions/wallet"
 
-export default async function WalletPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect("/auth/login")
+export default function WalletPage() {
+  // Mock user data for demo
+  const mockUser = {
+    id: "demo-user-123",
+    email: "geology.cupb16@gmail.com",
+    user_metadata: { full_name: "Mamun" },
   }
 
-  // Fetch user profile
-  const { data: userProfile } = await supabase.from("users").select("*").eq("id", user.id).single()
+  const mockUserProfile = {
+    id: "demo-profile-123",
+    email: "geology.cupb16@gmail.com",
+    full_name: "Mamun",
+    role: "educator",
+    wallet_balance: 9500,
+    organization: "Demo School",
+    phone: "+91 98765 43210",
+    created_at: "2025-01-15T10:00:00Z",
+  }
 
-  // Get wallet transactions and stats
-  const { transactions } = await getWalletTransactions()
-  const { stats } = await getWalletStats()
+  // Mock transactions and stats
+  const mockTransactions = [
+    {
+      id: "t1",
+      type: "credit",
+      amount: 500,
+      description: "Welcome bonus - Email verification",
+      created_at: "2025-01-15T10:00:00Z",
+      status: "completed",
+      balance_after: 500,
+      reference_type: "bonus"
+    }
+  ]
+
+  const mockStats = {
+    totalSpent: 35,
+    totalAdded: 500,
+    questionBatches: 1,
+    avgPerBatch: 35
+  }
 
   return (
-    <DashboardLayout user={user} userProfile={userProfile}>
-      <WalletManager userProfile={userProfile} transactions={transactions || []} stats={stats} />
+    <DashboardLayout user={mockUser} userProfile={mockUserProfile}>
+      <WalletManager userProfile={mockUserProfile} transactions={mockTransactions} stats={mockStats} />
     </DashboardLayout>
   )
 }

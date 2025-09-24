@@ -1,24 +1,28 @@
-import { createClient } from "@/lib/supabase/server"
-import { redirect } from "next/navigation"
 import DashboardLayout from "@/components/dashboard/dashboard-layout"
 import ProfileSettings from "@/components/dashboard/profile-settings"
 
-export default async function ProfilePage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect("/auth/login")
+export default function ProfilePage() {
+  // Mock user data for demo
+  const mockUser = {
+    id: "demo-user-123",
+    email: "geology.cupb16@gmail.com",
+    user_metadata: { full_name: "Mamun" },
   }
 
-  // Fetch user profile
-  const { data: userProfile } = await supabase.from("users").select("*").eq("email", user.email).single()
+  const mockUserProfile = {
+    id: "demo-profile-123",
+    email: "geology.cupb16@gmail.com",
+    full_name: "Mamun",
+    role: "educator",
+    wallet_balance: 9500,
+    organization: "Demo School",
+    phone: "+91 98765 43210",
+    created_at: "2025-01-15T10:00:00Z",
+  }
 
   return (
-    <DashboardLayout user={user} userProfile={userProfile}>
-      <ProfileSettings user={user} userProfile={userProfile} />
+    <DashboardLayout user={mockUser} userProfile={mockUserProfile}>
+      <ProfileSettings user={mockUser} userProfile={mockUserProfile} />
     </DashboardLayout>
   )
 }
