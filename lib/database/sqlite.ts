@@ -1,12 +1,18 @@
 import 'server-only'
 
-import Database from 'better-sqlite3'
 import { readFileSync } from 'fs'
 import { join } from 'path'
+
+// Conditional import to prevent client-side bundling
+const Database = typeof window === 'undefined' ? require('better-sqlite3') : null
 
 let db: Database.Database | null = null
 
 export async function getDatabase() {
+  if (typeof window !== 'undefined') {
+    throw new Error('Database operations are only available on the server')
+  }
+  
   if (db) {
     return db
   }
