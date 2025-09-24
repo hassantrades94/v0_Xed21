@@ -14,6 +14,7 @@ interface BloomSamplesManagementProps {
   samples: any[]
 }
 
+export default function BloomSamplesManagement({ samples: initialSamples }: BloomSamplesManagementProps) {
   const [samples, setSamples] = useState(initialSamples)
 
   const [showAddModal, setShowAddModal] = useState(false)
@@ -446,12 +447,12 @@ interface BloomSamplesManagementProps {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Bloom's Level</label>
                 <Badge variant="secondary" className="bg-purple-100 text-purple-800">
-                  {selectedSample?.bloomLevel}
+                  {selectedSample?.bloom_level}
                 </Badge>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Grade</label>
-                <Badge variant="secondary">Grade {selectedSample?.grade}</Badge>
+                <Badge variant="secondary">Grade {selectedSample?.grade_level}</Badge>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
@@ -463,7 +464,7 @@ interface BloomSamplesManagementProps {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Question</label>
               <div className="p-4 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-900">{selectedSample?.question}</p>
+                <p className="text-sm text-gray-900">{selectedSample?.sample_question}</p>
               </div>
             </div>
           </div>
