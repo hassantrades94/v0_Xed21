@@ -459,16 +459,31 @@ export async function rejectQuestion(questionId: string, reason?: string) {
 }
 
 export async function getBoards() {
-  const supabase = createClient()
-  const { data, error } = await supabase.from("boards").select(`
-    id,
-    name
-  `)
-  if (error) {
-    console.error("Error fetching boards:", error)
-    return []
+  try {
+    const supabase = createClient()
+    const { data, error } = await supabase.from("boards").select(`
+      id,
+      name
+    `)
+    if (error) {
+      console.error("Error fetching boards:", error)
+      // Return mock data if database query fails
+      return [
+        { id: "cbse", name: "CBSE/NCERT" },
+        { id: "icse", name: "ICSE/CISCE" },
+        { id: "state", name: "State Boards" },
+      ]
+    }
+    return data || []
+  } catch (error) {
+    console.error("Error in getBoards:", error)
+    // Return mock data if any error occurs
+    return [
+      { id: "cbse", name: "CBSE/NCERT" },
+      { id: "icse", name: "ICSE/CISCE" },
+      { id: "state", name: "State Boards" },
+    ]
   }
-  return data
 }
 
 export async function getSubjectsByBoard(boardId: string, gradeLevel: number) {
