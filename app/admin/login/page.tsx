@@ -6,9 +6,16 @@ import { BookOpen, Shield } from "lucide-react"
 
 export default async function AdminLoginPage() {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  
+  let user = null
+  try {
+    const {
+      data: { user: authUser },
+    } = await supabase.auth.getUser()
+    user = authUser
+  } catch (error) {
+    console.warn("Auth check failed:", error)
+  }
 
   // Check if user is admin (this would need proper role checking in real implementation)
   if (user) {

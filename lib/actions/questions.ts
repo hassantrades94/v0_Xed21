@@ -1,15 +1,6 @@
 "use server"
 
-import { 
-  getAllBoards, 
-  getSubjectsByBoardAndGrade, 
-  getTopicsBySubject,
-  createQuestion,
-  getQuestionsByUser,
-  getUserById,
-  updateUserWalletBalance,
-  createTransaction
-} from "@/lib/database/queries"
+import { createClient } from "@/lib/supabase/server"
 import { generateText } from "ai"
 import { groq } from "@ai-sdk/groq"
 import { openai } from "@ai-sdk/openai"
@@ -469,8 +460,16 @@ export async function rejectQuestion(questionId: string, reason?: string) {
 
 export async function getBoards() {
   try {
-    const boards = getAllBoards()
-    return boards
+    const supabase = await createClient()
+    const { data: boards, error } = await supabase.from("boards").select("*")
+    
+    if (error) throw error
+    
+    return boards || [
+      { id: "cbse", name: "CBSE/NCERT" },
+      { id: "icse", name: "ICSE/CISCE" },
+      { id: "state", name: "State Boards" },
+    ]
   } catch (error) {
     console.error("Error in getBoards:", error)
     // Return mock data if any error occurs
@@ -484,8 +483,22 @@ export async function getBoards() {
 
 export async function getSubjectsByBoard(boardId: string, gradeLevel: number) {
   try {
-    const subjects = getSubjectsByBoardAndGrade(boardId, gradeLevel)
-    return subjects
+    const supabase = await createClient()
+    const { data: subjects, error } = await supabase
+      .from("subjects")
+      .select("*")
+      .eq("board_id", boardId)
+      .eq("grade_level", gradeLevel)
+    
+    if (error) throw error
+    
+    return subjects || [
+      { id: "cbse-science-6", name: "Science" },
+      { id: "cbse-math-6", name: "Mathematics" },
+      { id: "cbse-english-6", name: "English" },
+      { id: "cbse-hindi-6", name: "Hindi" },
+      { id: "cbse-sst-6", name: "Social Science" },
+    ]
   } catch (error) {
     console.error("Error in getSubjectsByBoard:", error)
     // Return mock data if any error occurs
@@ -502,8 +515,22 @@ export async function getSubjectsByBoard(boardId: string, gradeLevel: number) {
 
 export async function getTopicsBySubject(subjectId: string, boardId: string, gradeLevel: number) {
   try {
-    const topics = getTopicsBySubject(subjectId)
-    return topics
+    const supabase = await createClient()
+    const { data: topics, error } = await supabase
+      .from("topics")
+      .select("*")
+      .eq("subject_id", subjectId)
+    
+    if (error) throw error
+    
+    return topics || [
+      { id: "exploring-magnets", name: "Exploring Magnets" },
+      { id: "light-shadows", name: "Light and Shadows" },
+      { id: "motion-measurement", name: "Motion and Measurement" },
+      { id: "materials-around-us", name: "Materials Around Us" },
+      { id: "living-organisms", name: "Living Organisms and Their Surroundings" },
+      { id: "components-food", name: "Components of Food" },
+    ]
   } catch (error) {
     console.error("Error in getTopicsBySubject:", error)
     // Return mock data if any error occurs

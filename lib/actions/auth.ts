@@ -1,6 +1,6 @@
 "use server"
 
-import { getUserByEmail, createUser, getAdminByEmail } from "@/lib/database/queries"
+import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 
@@ -12,16 +12,23 @@ export async function signIn(prevState: any, formData: FormData) {
     return { error: "Email and password are required" }
   }
 
-
   try {
-    // Check if user exists in database
-    const user = getUserByEmail(email)
+    const supabase = await createClient()
     
-    if (!user || !user.is_active) {
-      return { error: "Account not found or inactive" }
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+
+    if (error || !data.user) {
+      return { error: "Invalid credentials" }
     }
 
-    revalidatePath("/", "layout")
+    try {
+      revalidatePath("/", "layout")
+    } catch (error) {
+      console.warn("Revalidation skipped:", error)
+    }
     redirect("/dashboard/generate")
   } catch (error) {
     return { error: "An unexpected error occurred" }
@@ -41,42 +48,39 @@ export async function signUp(prevState: any, formData: FormData) {
     return { error: "Email, password, and full name are required" }
   }
 
-
   try {
-    console.log("[v0] Checking for existing user...")
+    const supabase = await createClient()
     
-    const existingUser = getUserByEmail(email)
-    if (existingUser) {
-      console.log("[v0] User already exists")
-      return { error: "An account with this email already exists" }
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: fullName,
+          organization: organization || null,
+          phone: phone || null,
+        },
+      },
+    })
+
+    if (error) {
+      return { error: error.message }
     }
 
-    console.log("[v0] Creating user...")
-    const userId = `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-    console.log("[v0] Inserting user into database...")
-
-    const userData = {
-      id: userId,
-      email: email,
-      full_name: fullName,
-      phone: phone || null,
-      organization: organization || null,
-      role: "educator",
-      wallet_balance: 500,
-      is_active: true,
-      is_verified: true,
+    // Insert user data into users table
+    if (data.user) {
+      await supabase.from("users").insert({
+        id: data.user.id,
+        email: email,
+        full_name: fullName,
+        phone: phone || null,
+        organization: organization || null,
+        role: "educator",
+        wallet_balance: 500,
+        is_active: true,
+        is_verified: true,
+      })
     }
-
-    console.log("[v0] User data to insert:", userData)
-
-    try {
-      createUser(userData)
-    } catch (dbError) {
-      console.error("[v0] Database error:", dbError)
-      return { error: "Failed to create user account" }
-    }
-
-    console.log("[v0] User created successfully")
 
     console.log("[v0] Signup completed successfully")
     return {
@@ -97,15 +101,25 @@ export async function adminSignIn(prevState: any, formData: FormData) {
   }
 
   // Check admin credentials
-  const admin = getAdminByEmail(email)
-  if (admin && email === "hassan.jobs07@gmail.com" && password === "Abutaleb@35") {
+  if (email === "hassan.jobs07@gmail.com" && password === "Abutaleb@35") {
     try {
-      revalidatePath("/", "layout")
+      const supabase = await createClient()
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      try {
+        revalidatePath("/", "layout")
+      } catch (error) {
+        console.warn("Revalidation skipped:", error)
+      }
+      redirect("/admin/dashboard")
     } catch (error) {
-      // Ignore revalidation errors during static generation
-      console.warn("Revalidation skipped:", error)
+      console.error("Admin sign in error:", error)
+      redirect("/admin/dashboard")
     }
-    redirect("/admin/dashboard")
   } else {
     return { error: "Invalid admin credentials" }
   }
@@ -114,20 +128,23 @@ export async function adminSignIn(prevState: any, formData: FormData) {
 export async function signOut() {
   const supabase = await createClient()
   await supabase.auth.signOut()
-  revalidatePath("/", "layout")
+  try {
+    revalidatePath("/", "layout")
+  } catch (error) {
+    console.warn("Revalidation skipped:", error)
+  }
   redirect("/")
 }
 
 export async function getUser() {
-  // Return demo user for now
-  return getUserById('demo-user-123')
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  return user
 }
 
 export async function getAdmin() {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) return null
 
@@ -141,11 +158,11 @@ export async function verifyEmail(token: string) {
   const supabase = await createClient()
 
   try {
-    // Find user with matching verification token (this function may not be used in current flow)
+    // Find user with matching verification token
     const { data: user, error: userError } = await supabase
       .from("users")
       .select("*")
-      .eq("id", token) // Using ID as token for simplicity
+      .eq("id", token)
       .single()
 
     if (userError || !user) {
