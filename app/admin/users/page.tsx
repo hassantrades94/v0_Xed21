@@ -1,7 +1,8 @@
 import AdminLayout from "@/components/admin/admin-layout"
 import UserManagement from "@/components/admin/user-management"
+import { getUsers } from "@/lib/actions/admin"
 
-export default function AdminUsersPage() {
+export default async function AdminUsersPage() {
   const mockAdmin = {
     id: "admin-1",
     full_name: "Hassan Admin",
@@ -10,37 +11,12 @@ export default function AdminUsersPage() {
     is_active: true,
   }
 
-  // Mock user data matching your screenshot
-  const mockUsers = [
-    {
-      id: 1,
-      full_name: "Ekbal Hassan",
-      email: "bellbottom743@gmail.com",
-      wallet_balance: 465,
-      is_active: true,
-      created_at: "2025-08-10",
-    },
-    {
-      id: 2,
-      full_name: "Mamun",
-      email: "geology.cupb16@gmail.com",
-      wallet_balance: 9465,
-      is_active: true,
-      created_at: "2025-08-07",
-    },
-    {
-      id: 3,
-      full_name: "Hassan Test User",
-      email: "hassan.jobs07@gmail.com",
-      wallet_balance: 1000,
-      is_active: true,
-      created_at: "2025-08-06",
-    },
-  ]
+  // Get real user data from database
+  const users = await getUsers()
 
   return (
     <AdminLayout admin={mockAdmin}>
-      <UserManagement users={mockUsers} totalCount={mockUsers.length} />
+      <UserManagement users={users} totalCount={users.length} />
     </AdminLayout>
   )
 }

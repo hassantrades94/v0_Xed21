@@ -10,45 +10,11 @@ import { Eye, Edit, Trash2 } from "lucide-react"
 import { createBloomSample, updateBloomSample, deleteBloomSample } from "@/lib/actions/admin"
 import { toast } from "@/components/ui/sonner"
 
-export default function BloomSamplesManagement() {
-  const [samples] = useState([
-    {
-      id: 1,
-      bloomLevel: "Remembering",
-      grade: "5",
-      subject: "Science",
-      question: "Which waste should not be added to compost? A. Vegetable peels ...",
-      status: "Active",
-      created: "07/08/2025",
-    },
-    {
-      id: 2,
-      bloomLevel: "Remembering",
-      grade: "5",
-      subject: "Science",
-      question: "What is non-degradable waste? A. Waste that breaks down quickly ...",
-      status: "Active",
-      created: "07/08/2025",
-    },
-    {
-      id: 3,
-      bloomLevel: "Remembering",
-      grade: "5",
-      subject: "Science",
-      question: "Which material breaks down naturally and enriches the soil? A. Stee...",
-      status: "Active",
-      created: "07/08/2025",
-    },
-    {
-      id: 4,
-      bloomLevel: "Remembering",
-      grade: "5",
-      subject: "Science",
-      question: "What is an example of biodegradable waste? A. Plastic bottle B. Ba...",
-      status: "Active",
-      created: "07/08/2025",
-    },
-  ])
+interface BloomSamplesManagementProps {
+  samples: any[]
+}
+
+  const [samples, setSamples] = useState(initialSamples)
 
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
@@ -71,10 +37,10 @@ export default function BloomSamplesManagement() {
   const handleEditSample = (sample: any) => {
     setSelectedSample(sample)
     setSampleForm({
-      bloomLevel: sample.bloomLevel,
-      grade: sample.grade,
+      bloomLevel: sample.bloom_level,
+      grade: sample.grade_level.toString(),
       subject: sample.subject,
-      question: sample.question,
+      question: sample.sample_question,
     })
     setShowEditModal(true)
   }
@@ -106,7 +72,7 @@ export default function BloomSamplesManagement() {
         toast.success(result.message)
         setShowAddModal(false)
       } else {
-        toast.error(result.message)
+        window.location.reload()
       }
     })
   }
@@ -119,7 +85,7 @@ export default function BloomSamplesManagement() {
 
     startTransition(async () => {
       const result = await updateBloomSample(
-        selectedSample.id.toString(),
+        selectedSample.id,
         sampleForm.bloomLevel,
         sampleForm.grade,
         sampleForm.subject,
@@ -128,6 +94,7 @@ export default function BloomSamplesManagement() {
       if (result.success) {
         toast.success(result.message)
         setShowEditModal(false)
+        window.location.reload()
       } else {
         toast.error(result.message)
       }
@@ -138,10 +105,11 @@ export default function BloomSamplesManagement() {
     if (!selectedSample) return
 
     startTransition(async () => {
-      const result = await deleteBloomSample(selectedSample.id.toString())
+      const result = await deleteBloomSample(selectedSample.id)
       if (result.success) {
         toast.success(result.message)
         setShowDeleteDialog(false)
+        window.location.reload()
       } else {
         toast.error(result.message)
       }
@@ -262,11 +230,11 @@ export default function BloomSamplesManagement() {
               {samples.map((sample) => (
                 <tr key={sample.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm font-medium text-gray-900">{sample.bloomLevel}</span>
+                    <span className="text-sm font-medium text-gray-900">{sample.bloom_level}</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <Badge variant="secondary" className="bg-purple-100 text-purple-800">
-                      Grade {sample.grade}
+                      Grade {sample.grade_level}
                     </Badge>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -274,13 +242,15 @@ export default function BloomSamplesManagement() {
                       {sample.subject}
                     </Badge>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-900 max-w-md truncate">{sample.question}</td>
+                  <td className="px-6 py-4 text-sm text-gray-900 max-w-md truncate">{sample.sample_question}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                      {sample.status}
+                      {sample.is_active ? "Active" : "Inactive"}
                     </Badge>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sample.created}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {new Date(sample.created_at).toLocaleDateString()}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
                     <Button variant="ghost" size="sm" onClick={() => handleViewSample(sample)} disabled={isPending}>
                       <Eye className="h-4 w-4" />

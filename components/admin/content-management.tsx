@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { createBoard, updateBoard, deleteBoard, createSubject, createTopic, getSubjectsForBoard, getTopicsForSubject } from "@/lib/actions/admin"
 import { ChevronDown, ChevronRight, Edit, FileText, Plus, Trash2, X } from "lucide-react"
 
 interface ContentManagementProps {
@@ -16,6 +16,7 @@ interface ContentManagementProps {
 export default function ContentManagement({ boards: initialBoards }: ContentManagementProps) {
   const [boards, setBoards] = useState(initialBoards)
   const [selectedBoard, setSelectedBoard] = useState("CBSE/NCERT")
+  const [selectedBoardId, setSelectedBoardId] = useState("")
   const [expandedGrades, setExpandedGrades] = useState<{ [key: string]: boolean }>({
     "Grade 1": true,
   })
@@ -27,13 +28,58 @@ export default function ContentManagement({ boards: initialBoards }: ContentMana
   const [showAddBoardModal, setShowAddBoardModal] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = useState(false)
+  const [showAddSubjectModal, setShowAddSubjectModal] = useState(false)
+  const [showAddTopicModal, setShowAddTopicModal] = useState(false)
   const [currentContent, setCurrentContent] = useState({ title: "", content: "" })
   const [newBoardName, setNewBoardName] = useState("")
+  const [newBoardCode, setNewBoardCode] = useState("")
+  const [newBoardDescription, setNewBoardDescription] = useState("")
+  const [subjectForm, setSubjectForm] = useState({ name: "", code: "", grade: "" })
+  const [topicForm, setTopicForm] = useState({ name: "", description: "", subjectId: "" })
   const [pendingAction, setPendingAction] = useState<() => void>(() => {})
   const [deleteAction, setDeleteAction] = useState<() => void>(() => {})
+  const [isPending, startTransition] = useTransition()
+  const [subjects, setSubjects] = useState<any[]>([])
+  const [topics, setTopics] = useState<any[]>([])
+
+  useEffect(() => {
+    if (boards.length > 0 && !selectedBoardId) {
+      const firstBoard = boards[0]
+      setSelectedBoard(firstBoard.name)
+      setSelectedBoardId(firstBoard.id)
+    }
+  }, [boards])
+
+  useEffect(() => {
+    if (selectedBoardId) {
+      loadSubjectsForGrade(1) // Load Grade 1 subjects by default
+    }
+  }, [selectedBoardId])
+
+  const loadSubjectsForGrade = async (grade: number) => {
+    if (!selectedBoardId) return
+    
+    try {
+      const subjectsData = await getSubjectsForBoard(selectedBoardId, grade)
+      setSubjects(subjectsData)
+    } catch (error) {
+      console.error("Error loading subjects:", error)
+    }
+  }
+
+  const loadTopicsForSubject = async (subjectId: string) => {
+    try {
+      const topicsData = await getTopicsForSubject(subjectId)
+      setTopics(topicsData)
+    } catch (error) {
+      console.error("Error loading topics:", error)
+    }
+  }
 
   const toggleGrade = (grade: string) => {
     setExpandedGrades((prev) => ({ ...prev, [grade]: !prev[grade] }))
+    const gradeNumber = parseInt(grade.split(" ")[1])
+    loadSubjectsForGrade(gradeNumber)
   }
 
   const toggleSubject = (subject: string) => {
@@ -48,35 +94,31 @@ export default function ContentManagement({ boards: initialBoards }: ContentMana
     setShowContentModal(true)
   }
 
-  const addBoard = () => {
-    if (!newBoardName.trim()) return
-
-    const newBoard = {
-      id: Date.now(),
-      name: newBoardName,
-      subjects: [],
+  const addBoard = async () => {
+    if (!newBoardName.trim() || !newBoardCode.trim()) {
+      toast.error("Please fill in board name and code")
+      return
     }
 
-    // Auto-generate grades 1-12 with basic subjects
-    for (let grade = 1; grade <= 12; grade++) {
-      const basicSubjects =
-        grade <= 5
-          ? ["English", "Mathematics", "Science", "Social Studies"]
-          : ["English", "Mathematics", "Science", "Social Studies", "Hindi"]
-
-      basicSubjects.forEach((subjectName, index) => {
-        newBoard.subjects.push({
-          id: Date.now() + grade * 100 + index,
-          name: subjectName,
-          grade: grade,
-          topics: [],
-        })
+    startTransition(async () => {
+      const result = await createBoard({
+        name: newBoardName,
+        code: newBoardCode,
+        description: newBoardDescription
       })
-    }
-
-    setBoards([...boards, newBoard])
-    setNewBoardName("")
-    setShowAddBoardModal(false)
+      
+      if (result.success) {
+        toast.success(result.message)
+        setNewBoardName("")
+        setNewBoardCode("")
+        setNewBoardDescription("")
+        setShowAddBoardModal(false)
+        // Refresh boards list
+        window.location.reload()
+      } else {
+        toast.error(result.message)
+      }
+    })
   }
 
   const confirmAction = (action: () => void) => {
@@ -99,11 +141,73 @@ export default function ContentManagement({ boards: initialBoards }: ContentMana
     setShowDeleteConfirmDialog(false)
   }
 
-  const removeBoard = (boardName: string) => {
-    setBoards(boards.filter((b) => b.name !== boardName))
-    if (selectedBoard === boardName) {
-      setSelectedBoard(boards[0]?.name || "")
+  const removeBoard = async (boardId: string) => {
+    startTransition(async () => {
+      const result = await deleteBoard(boardId)
+      if (result.success) {
+        toast.success(result.message)
+        window.location.reload()
+      } else {
+        toast.error(result.message)
+      }
+    })
+  }
+
+  const handleBoardChange = (boardName: string) => {
+    setSelectedBoard(boardName)
+    const board = boards.find(b => b.name === boardName)
+    if (board) {
+      setSelectedBoardId(board.id)
     }
+  }
+
+  const addSubject = async () => {
+    if (!subjectForm.name.trim() || !subjectForm.code.trim() || !subjectForm.grade) {
+      toast.error("Please fill in all subject fields")
+      return
+    }
+
+    startTransition(async () => {
+      const result = await createSubject({
+        name: subjectForm.name,
+        code: subjectForm.code,
+        boardId: selectedBoardId,
+        gradeLevel: parseInt(subjectForm.grade)
+      })
+      
+      if (result.success) {
+        toast.success(result.message)
+        setSubjectForm({ name: "", code: "", grade: "" })
+        setShowAddSubjectModal(false)
+        loadSubjectsForGrade(parseInt(subjectForm.grade))
+      } else {
+        toast.error(result.message)
+      }
+    })
+  }
+
+  const addTopic = async () => {
+    if (!topicForm.name.trim() || !topicForm.subjectId) {
+      toast.error("Please fill in topic name and select subject")
+      return
+    }
+
+    startTransition(async () => {
+      const result = await createTopic({
+        name: topicForm.name,
+        description: topicForm.description,
+        subjectId: topicForm.subjectId
+      })
+      
+      if (result.success) {
+        toast.success(result.message)
+        setTopicForm({ name: "", description: "", subjectId: "" })
+        setShowAddTopicModal(false)
+        loadTopicsForSubject(topicForm.subjectId)
+      } else {
+        toast.error(result.message)
+      }
+    })
   }
 
   // Mock grade data
@@ -114,7 +218,7 @@ export default function ContentManagement({ boards: initialBoards }: ContentMana
     { name: "Grade 4", subjects: 4 },
   ]
 
-  const currentBoard = boards.find((b) => b.name === selectedBoard) || boards[0]
+  const currentBoard = boards.find((b) => b.name === selectedBoard)
 
   return (
     <div className="space-y-6">
@@ -138,7 +242,7 @@ export default function ContentManagement({ boards: initialBoards }: ContentMana
           <div className="flex items-center justify-between">
             <div className="flex-1 mr-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">Select Board</label>
-              <Select value={selectedBoard} onValueChange={setSelectedBoard}>
+              <Select value={selectedBoard} onValueChange={handleBoardChange}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
@@ -155,8 +259,9 @@ export default function ContentManagement({ boards: initialBoards }: ContentMana
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => confirmDelete(() => removeBoard(selectedBoard))}
+                onClick={() => confirmDelete(() => removeBoard(selectedBoardId))}
                 className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                disabled={isPending}
               >
                 <Trash2 className="h-4 w-4 mr-1" />
                 Delete Board
@@ -187,7 +292,7 @@ export default function ContentManagement({ boards: initialBoards }: ContentMana
                     <div className="flex items-center space-x-2">
                       <Button variant="outline" size="sm">
                         <Plus className="h-4 w-4 mr-1" />
-                        Add Subject
+                        <span onClick={() => setShowAddSubjectModal(true)}>Add Subject</span>
                       </Button>
                       <Button
                         variant="ghost"
@@ -201,9 +306,7 @@ export default function ContentManagement({ boards: initialBoards }: ContentMana
 
                   {expandedGrades[grade.name] && (
                     <div className="p-4 space-y-3">
-                      {currentBoard.subjects
-                        ?.filter((subject: any) => subject.grade === Number.parseInt(grade.name.split(" ")[1]))
-                        .map((subject: any) => (
+                      {subjects.map((subject: any) => (
                           <div key={subject.id} className="border border-gray-200 rounded-lg">
                             <div className="flex items-center justify-between p-3 bg-gray-50">
                               <div className="flex items-center space-x-3">
@@ -215,7 +318,7 @@ export default function ContentManagement({ boards: initialBoards }: ContentMana
                                   )}
                                 </button>
                                 <span className="font-medium text-gray-900">{subject.name}</span>
-                                <span className="text-sm text-gray-500">{subject.topics?.length || 0} topics</span>
+                                <span className="text-sm text-gray-500">0 topics</span>
                               </div>
                               <div className="flex items-center space-x-2">
                                 <Button
@@ -227,6 +330,10 @@ export default function ContentManagement({ boards: initialBoards }: ContentMana
                                 </Button>
                                 <Button variant="ghost" size="sm">
                                   <Plus className="h-4 w-4" />
+                                  <span onClick={() => {
+                                    setTopicForm({ ...topicForm, subjectId: subject.id })
+                                    setShowAddTopicModal(true)
+                                  }}>Add Topic</span>
                                 </Button>
                                 <Button
                                   variant="ghost"
@@ -241,7 +348,7 @@ export default function ContentManagement({ boards: initialBoards }: ContentMana
 
                             {expandedSubjects[subject.name] && (
                               <div className="p-3 space-y-2">
-                                {subject.topics?.map((topic: any) => (
+                                {topics.filter(t => t.subject_id === subject.id).map((topic: any) => (
                                   <div
                                     key={topic.id}
                                     className="flex items-center justify-between p-2 hover:bg-gray-50 rounded"
@@ -392,13 +499,114 @@ export default function ContentManagement({ boards: initialBoards }: ContentMana
                 placeholder="e.g., Maharashtra State Board"
               />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Board Code</label>
+              <Input
+                value={newBoardCode}
+                onChange={(e) => setNewBoardCode(e.target.value)}
+                placeholder="e.g., MSBSHSE"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Description (Optional)</label>
+              <Textarea
+                value={newBoardDescription}
+                onChange={(e) => setNewBoardDescription(e.target.value)}
+                placeholder="Brief description of the board"
+                rows={3}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddBoardModal(false)}>
               Cancel
             </Button>
-            <Button onClick={() => confirmAction(addBoard)} className="bg-blue-600 hover:bg-blue-700">
-              Add Board
+            <Button onClick={addBoard} className="bg-blue-600 hover:bg-blue-700" disabled={isPending}>
+              {isPending ? "Creating..." : "Add Board"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showAddSubjectModal} onOpenChange={setShowAddSubjectModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New Subject</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Subject Name</label>
+              <Input
+                value={subjectForm.name}
+                onChange={(e) => setSubjectForm({ ...subjectForm, name: e.target.value })}
+                placeholder="e.g., Mathematics"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Subject Code</label>
+              <Input
+                value={subjectForm.code}
+                onChange={(e) => setSubjectForm({ ...subjectForm, code: e.target.value })}
+                placeholder="e.g., MATH"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Grade Level</label>
+              <Select value={subjectForm.grade} onValueChange={(value) => setSubjectForm({ ...subjectForm, grade: value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select grade" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 12 }, (_, i) => (
+                    <SelectItem key={i + 1} value={(i + 1).toString()}>
+                      Grade {i + 1}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddSubjectModal(false)}>
+              Cancel
+            </Button>
+            <Button onClick={addSubject} className="bg-blue-600 hover:bg-blue-700" disabled={isPending}>
+              {isPending ? "Creating..." : "Add Subject"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showAddTopicModal} onOpenChange={setShowAddTopicModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New Topic</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Topic Name</label>
+              <Input
+                value={topicForm.name}
+                onChange={(e) => setTopicForm({ ...topicForm, name: e.target.value })}
+                placeholder="e.g., Algebra"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Description (Optional)</label>
+              <Textarea
+                value={topicForm.description}
+                onChange={(e) => setTopicForm({ ...topicForm, description: e.target.value })}
+                placeholder="Brief description of the topic"
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddTopicModal(false)}>
+              Cancel
+            </Button>
+            <Button onClick={addTopic} className="bg-blue-600 hover:bg-blue-700" disabled={isPending}>
+              {isPending ? "Creating..." : "Add Topic"}
             </Button>
           </DialogFooter>
         </DialogContent>
