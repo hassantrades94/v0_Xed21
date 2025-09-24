@@ -234,6 +234,3 @@ export async function deleteBloomSampleDB(id: string) {
   const stmt = db.prepare('DELETE FROM bloom_samples WHERE id = ?')
   stmt.run(id)
 }
-
-// Export database instance for direct access if needed
-export { getDatabase }
