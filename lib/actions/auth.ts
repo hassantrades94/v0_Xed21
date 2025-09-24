@@ -15,7 +15,8 @@ export async function signIn(prevState: any, formData: FormData) {
   const supabase = createClient()
 
   try {
-    const { error } = await supabase.auth.signInWithPassword({
+    const client = await supabase
+    const { error } = await client.auth.signInWithPassword({
       email,
       password,
     })
@@ -25,14 +26,14 @@ export async function signIn(prevState: any, formData: FormData) {
     }
 
     // Check if user exists in users table
-    const { data: user, error: userError } = await supabase
+    const { data: user, error: userError } = await client
       .from("users")
       .select("id, role, is_active")
       .eq("email", email)
       .single()
 
     if (userError || !user || !user.is_active) {
-      await supabase.auth.signOut()
+      await client.auth.signOut()
       return { error: "Account not found or inactive" }
     }
 
@@ -59,9 +60,10 @@ export async function signUp(prevState: any, formData: FormData) {
   const supabase = createClient()
 
   try {
+    const client = await supabase
     console.log("[v0] Checking for existing user...")
     // First check if user already exists
-    const { data: existingUser, error: checkError } = await supabase
+    const { data: existingUser, error: checkError } = await client
       .from("users")
       .select("id")
       .eq("email", email)
@@ -79,7 +81,7 @@ export async function signUp(prevState: any, formData: FormData) {
     }
 
     console.log("[v0] Creating auth user...")
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    const { data: authData, error: authError } = await client.auth.signUp({
       email,
       password,
     })
@@ -111,7 +113,7 @@ export async function signUp(prevState: any, formData: FormData) {
 
     console.log("[v0] User data to insert:", userData)
 
-    const { error: dbError } = await supabase.from("users").insert(userData)
+    const { error: dbError } = await client.from("users").insert(userData)
 
     if (dbError) {
       console.error("[v0] Database error details:", {
@@ -125,7 +127,7 @@ export async function signUp(prevState: any, formData: FormData) {
 
     console.log("[v0] User inserted successfully, creating wallet transaction...")
 
-    const { error: transactionError } = await supabase.from("wallet_transactions").insert({
+    const { error: transactionError } = await client.from("wallet_transactions").insert({
       user_id: authData.user.id,
       transaction_type: "credit",
       amount: 500,
@@ -172,14 +174,14 @@ export async function adminSignIn(prevState: any, formData: FormData) {
 }
 
 export async function signOut() {
-  const supabase = createClient()
+  const supabase = await createClient()
   await supabase.auth.signOut()
   revalidatePath("/", "layout")
   redirect("/")
 }
 
 export async function getUser() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -193,7 +195,7 @@ export async function getUser() {
 }
 
 export async function getAdmin() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()

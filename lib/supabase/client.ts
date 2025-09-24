@@ -1,4 +1,3 @@
-import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { createBrowserClient } from "@supabase/ssr"
 
 export const createClient = () => {
@@ -10,15 +9,24 @@ export const createClient = () => {
     // Return a mock client that won't cause errors
     return {
       from: () => ({
-        select: () => ({ data: [], error: null }),
-        insert: () => ({ data: [], error: null }),
-        update: () => ({ data: [], error: null }),
-        delete: () => ({ data: [], error: null }),
-        single: () => ({ data: null, error: null }),
+        select: () => Promise.resolve({ data: [], error: null }),
+        insert: () => Promise.resolve({ data: [], error: null }),
+        update: () => Promise.resolve({ data: [], error: null }),
+        delete: () => Promise.resolve({ data: [], error: null }),
+        single: () => Promise.resolve({ data: null, error: null }),
+        eq: () => ({
+          select: () => Promise.resolve({ data: [], error: null }),
+          single: () => Promise.resolve({ data: null, error: null }),
+        }),
+        order: () => ({
+          limit: () => Promise.resolve({ data: [], error: null }),
+        }),
       }),
       auth: {
         getUser: () => Promise.resolve({ data: { user: null }, error: null }),
         signOut: () => Promise.resolve({ error: null }),
+        signInWithPassword: () => Promise.resolve({ data: { user: null }, error: null }),
+        signUp: () => Promise.resolve({ data: { user: null }, error: null }),
       },
     } as any
   }
@@ -30,4 +38,7 @@ export const createClient = () => {
 export const supabase = createClient()
 
 // Check if Supabase is properly configured
-export const isSupabaseConfigured = true
+export const isSupabaseConfigured = !!(
+  process.env.NEXT_PUBLIC_SUPABASE_URL && 
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+)

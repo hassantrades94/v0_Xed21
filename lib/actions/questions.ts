@@ -460,7 +460,7 @@ export async function rejectQuestion(questionId: string, reason?: string) {
 
 export async function getBoards() {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     const { data, error } = await supabase.from("boards").select(`
       id,
       name
@@ -487,7 +487,7 @@ export async function getBoards() {
 }
 
 export async function getSubjectsByBoard(boardId: string, gradeLevel: number) {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data, error } = await supabase
     .from("subjects")
     .select(`
@@ -510,7 +510,7 @@ export async function getSubjectsByBoard(boardId: string, gradeLevel: number) {
 }
 
 export async function getTopicsBySubject(subjectId: string, boardId: string, gradeLevel: number) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   const { data, error } = await supabase
     .from("topics")
