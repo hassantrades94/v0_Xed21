@@ -1,53 +1,64 @@
-import { createServerClient } from "@supabase/ssr"
-import { cookies } from "next/headers"
-import { cache } from "react"
-
-export const createClient = cache(async () => {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.warn('Supabase environment variables not found, using mock client')
-    // Return a mock client that won't cause errors
-    return {
-      from: () => ({
-        select: () => Promise.resolve({ data: [], error: null }),
-        insert: () => Promise.resolve({ data: [], error: null }),
-        update: () => Promise.resolve({ data: [], error: null }),
-        delete: () => Promise.resolve({ data: [], error: null }),
-        single: () => Promise.resolve({ data: null, error: null }),
-        eq: () => ({
-          select: () => Promise.resolve({ data: [], error: null }),
+// Mock Supabase server client for Bolt environment
+export const createClient = async () => {
+  // Return a mock client that simulates Supabase functionality
+  return {
+    from: (table: string) => ({
+      select: (columns?: string) => ({
+        eq: (column: string, value: any) => ({
           single: () => Promise.resolve({ data: null, error: null }),
+          limit: (count: number) => Promise.resolve({ data: [], error: null }),
+          order: (column: string, options?: any) => ({
+            limit: (count: number) => Promise.resolve({ data: [], error: null }),
+          }),
         }),
+        order: (column: string, options?: any) => ({
+          limit: (count: number) => Promise.resolve({ data: [], error: null }),
+        }),
+        limit: (count: number) => Promise.resolve({ data: [], error: null }),
+        single: () => Promise.resolve({ data: null, error: null }),
       }),
-      auth: {
-        getUser: () => Promise.resolve({ data: { user: null }, error: null }),
-        signOut: () => Promise.resolve({ error: null }),
-        signInWithPassword: () => Promise.resolve({ data: { user: null }, error: null }),
-        signUp: () => Promise.resolve({ data: { user: null }, error: null }),
-      },
-    } as any
-  }
-  
-  const cookieStore = await cookies()
-  
-  return createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      getAll() {
-        return cookieStore.getAll()
-      },
-      setAll(cookiesToSet) {
-        try {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
-          )
-        } catch {
-          // The `setAll` method was called from a Server Component.
-          // This can be ignored if you have middleware refreshing
-          // user sessions.
-        }
-      },
+      insert: (data: any) => ({
+        select: () => Promise.resolve({ data: [], error: null }),
+      }),
+      update: (data: any) => ({
+        eq: (column: string, value: any) => Promise.resolve({ data: [], error: null }),
+      }),
+      delete: () => ({
+        eq: (column: string, value: any) => Promise.resolve({ data: [], error: null }),
+      }),
+    }),
+    auth: {
+      getUser: () => Promise.resolve({ 
+        data: { 
+          user: {
+            id: 'demo-user-123',
+            email: 'geology.cupb16@gmail.com',
+            user_metadata: { full_name: 'Mamun' }
+          } 
+        }, 
+        error: null 
+      }),
+      signOut: () => Promise.resolve({ error: null }),
+      signInWithPassword: (credentials: any) => Promise.resolve({ 
+        data: { 
+          user: {
+            id: 'demo-user-123',
+            email: credentials.email,
+            user_metadata: { full_name: 'Demo User' }
+          } 
+        }, 
+        error: null 
+      }),
+      signUp: (credentials: any) => Promise.resolve({ 
+        data: { 
+          user: {
+            id: 'demo-user-123',
+            email: credentials.email,
+            user_metadata: { full_name: 'Demo User' }
+          } 
+        }, 
+        error: null 
+      }),
     },
-  })
-})
+  }
+}

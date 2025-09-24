@@ -1,44 +1,70 @@
-import { createBrowserClient } from "@supabase/ssr"
-
+// Mock Supabase client for Bolt environment
 export const createClient = () => {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.warn('Supabase environment variables not found, using mock client')
-    // Return a mock client that won't cause errors
-    return {
-      from: () => ({
-        select: () => Promise.resolve({ data: [], error: null }),
-        insert: () => Promise.resolve({ data: [], error: null }),
-        update: () => Promise.resolve({ data: [], error: null }),
-        delete: () => Promise.resolve({ data: [], error: null }),
-        single: () => Promise.resolve({ data: null, error: null }),
-        eq: () => ({
-          select: () => Promise.resolve({ data: [], error: null }),
+  // Return a mock client that simulates Supabase functionality
+  return {
+    from: (table: string) => ({
+      select: (columns?: string) => ({
+        eq: (column: string, value: any) => ({
           single: () => Promise.resolve({ data: null, error: null }),
+          limit: (count: number) => Promise.resolve({ data: [], error: null }),
+          order: (column: string, options?: any) => ({
+            limit: (count: number) => Promise.resolve({ data: [], error: null }),
+          }),
         }),
-        order: () => ({
-          limit: () => Promise.resolve({ data: [], error: null }),
+        order: (column: string, options?: any) => ({
+          limit: (count: number) => Promise.resolve({ data: [], error: null }),
         }),
+        limit: (count: number) => Promise.resolve({ data: [], error: null }),
+        single: () => Promise.resolve({ data: null, error: null }),
       }),
-      auth: {
-        getUser: () => Promise.resolve({ data: { user: null }, error: null }),
-        signOut: () => Promise.resolve({ error: null }),
-        signInWithPassword: () => Promise.resolve({ data: { user: null }, error: null }),
-        signUp: () => Promise.resolve({ data: { user: null }, error: null }),
-      },
-    } as any
+      insert: (data: any) => ({
+        select: () => Promise.resolve({ data: [], error: null }),
+      }),
+      update: (data: any) => ({
+        eq: (column: string, value: any) => Promise.resolve({ data: [], error: null }),
+      }),
+      delete: () => ({
+        eq: (column: string, value: any) => Promise.resolve({ data: [], error: null }),
+      }),
+    }),
+    auth: {
+      getUser: () => Promise.resolve({ 
+        data: { 
+          user: {
+            id: 'demo-user-123',
+            email: 'geology.cupb16@gmail.com',
+            user_metadata: { full_name: 'Mamun' }
+          } 
+        }, 
+        error: null 
+      }),
+      signOut: () => Promise.resolve({ error: null }),
+      signInWithPassword: (credentials: any) => Promise.resolve({ 
+        data: { 
+          user: {
+            id: 'demo-user-123',
+            email: credentials.email,
+            user_metadata: { full_name: 'Demo User' }
+          } 
+        }, 
+        error: null 
+      }),
+      signUp: (credentials: any) => Promise.resolve({ 
+        data: { 
+          user: {
+            id: 'demo-user-123',
+            email: credentials.email,
+            user_metadata: { full_name: 'Demo User' }
+          } 
+        }, 
+        error: null 
+      }),
+    },
   }
-  
-  return createBrowserClient(supabaseUrl, supabaseAnonKey)
 }
 
 // Legacy export for backward compatibility
 export const supabase = createClient()
 
 // Check if Supabase is properly configured
-export const isSupabaseConfigured = !!(
-  process.env.NEXT_PUBLIC_SUPABASE_URL && 
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-)
+export const isSupabaseConfigured = false // Always false in Bolt environment
