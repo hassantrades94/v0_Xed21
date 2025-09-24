@@ -1,3 +1,5 @@
+import 'server-only'
+
 // Mock Supabase server client for Bolt environment
 export async function createClient() {
   // Mock user data
