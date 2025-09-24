@@ -5,7 +5,7 @@ import Link from "next/link"
 import { BookOpen, Shield } from "lucide-react"
 
 export default async function AdminLoginPage() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()

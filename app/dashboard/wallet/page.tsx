@@ -5,7 +5,7 @@ import WalletManager from "@/components/dashboard/wallet-manager"
 import { getWalletTransactions, getWalletStats } from "@/lib/actions/wallet"
 
 export default async function WalletPage() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()

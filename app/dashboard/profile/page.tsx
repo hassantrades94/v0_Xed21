@@ -4,7 +4,7 @@ import DashboardLayout from "@/components/dashboard/dashboard-layout"
 import ProfileSettings from "@/components/dashboard/profile-settings"
 
 export default async function ProfilePage() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()

@@ -65,7 +65,7 @@ const processLearningOutcome = (outcome: string): { actionVerbs: string[]; focus
 }
 
 export async function generateQuestions(formData: FormData) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   const mockUser = {
     id: "demo-user-123",
@@ -436,7 +436,7 @@ CRITICAL: Generate exactly ${count} questions. Ensure each question tests differ
 }
 
 export async function approveQuestion(questionId: string) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   const { error } = await supabase.from("questions").update({ status: "approved" }).eq("id", questionId)
 
@@ -449,7 +449,7 @@ export async function approveQuestion(questionId: string) {
 }
 
 export async function rejectQuestion(questionId: string, reason?: string) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   const { error } = await supabase
     .from("questions")

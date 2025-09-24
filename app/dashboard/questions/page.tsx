@@ -4,7 +4,7 @@ import DashboardLayout from "@/components/dashboard/dashboard-layout"
 import QuestionLibrary from "@/components/dashboard/question-library"
 
 export default async function QuestionsPage() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()

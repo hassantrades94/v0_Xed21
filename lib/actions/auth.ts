@@ -138,7 +138,7 @@ export async function getAdmin() {
 }
 
 export async function verifyEmail(token: string) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     // Find user with matching verification token (this function may not be used in current flow)
