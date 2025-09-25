@@ -1,12 +1,20 @@
-"use client"
-
-import { useState } from "react"
+import React, { useState, useTransition, useEffect } from "react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { ChevronDown, ChevronRight, Edit, FileText, Plus, Trash2, X } from "lucide-react"
+import { 
+  createBoard, 
+  deleteBoard, 
+  createSubject, 
+  createTopic, 
+  getSubjectsForBoard, 
+  getTopicsForSubject 
+} from "@/lib/actions/admin"
 
 interface ContentManagementProps {
   boards: any[]
