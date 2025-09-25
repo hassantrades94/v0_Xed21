@@ -14,12 +14,15 @@ export async function getDatabase() {
     return db
   }
 
-  // Dynamic import to prevent client-side bundling
-  const Database = await import('better-sqlite3')
-  const DatabaseConstructor = Database.default
+  // Conditional require to prevent client-side bundling
+  if (process.env.NEXT_RUNTIME !== 'nodejs') {
+    throw new Error('Database operations are only available in Node.js runtime')
+  }
+  
+  const Database = require('better-sqlite3')
 
   // Create database connection
-  db = new DatabaseConstructor('database.sqlite')
+  db = new Database('database.sqlite')
   
   // Enable foreign keys
   db.pragma('foreign_keys = ON')
