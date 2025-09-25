@@ -1,5 +1,6 @@
+"use client"
+
 import React, { useState, useTransition, useEffect } from "react"
-import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
@@ -7,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { ChevronDown, ChevronRight, Edit, FileText, Plus, Trash2, X } from "lucide-react"
+import { toast } from "@/components/ui/sonner"
 import { 
   createBoard, 
   deleteBoard, 
@@ -22,14 +24,12 @@ interface ContentManagementProps {
 
 export default function ContentManagement({ boards: initialBoards }: ContentManagementProps) {
   const [boards, setBoards] = useState(initialBoards)
-  const [selectedBoard, setSelectedBoard] = useState("CBSE/NCERT")
+  const [selectedBoard, setSelectedBoard] = useState("")
   const [selectedBoardId, setSelectedBoardId] = useState("")
   const [expandedGrades, setExpandedGrades] = useState<{ [key: string]: boolean }>({
     "Grade 1": true,
   })
-  const [expandedSubjects, setExpandedSubjects] = useState<{ [key: string]: boolean }>({
-    English: true,
-  })
+  const [expandedSubjects, setExpandedSubjects] = useState<{ [key: string]: boolean }>({})
 
   const [showContentModal, setShowContentModal] = useState(false)
   const [showAddBoardModal, setShowAddBoardModal] = useState(false)
@@ -55,7 +55,7 @@ export default function ContentManagement({ boards: initialBoards }: ContentMana
       setSelectedBoard(firstBoard.name)
       setSelectedBoardId(firstBoard.id)
     }
-  }, [boards])
+  }, [boards, selectedBoardId])
 
   useEffect(() => {
     if (selectedBoardId) {
@@ -71,6 +71,7 @@ export default function ContentManagement({ boards: initialBoards }: ContentMana
       setSubjects(subjectsData)
     } catch (error) {
       console.error("Error loading subjects:", error)
+      toast.error("Failed to load subjects")
     }
   }
 
@@ -80,6 +81,7 @@ export default function ContentManagement({ boards: initialBoards }: ContentMana
       setTopics(topicsData)
     } catch (error) {
       console.error("Error loading topics:", error)
+      toast.error("Failed to load topics")
     }
   }
 
@@ -89,8 +91,11 @@ export default function ContentManagement({ boards: initialBoards }: ContentMana
     loadSubjectsForGrade(gradeNumber)
   }
 
-  const toggleSubject = (subject: string) => {
+  const toggleSubject = (subject: string, subjectId: string) => {
     setExpandedSubjects((prev) => ({ ...prev, [subject]: !prev[subject] }))
+    if (!expandedSubjects[subject]) {
+      loadTopicsForSubject(subjectId)
+    }
   }
 
   const openContentModal = (topicName: string) => {
@@ -217,15 +222,12 @@ export default function ContentManagement({ boards: initialBoards }: ContentMana
     })
   }
 
-  // Mock grade data
-  const grades = [
-    { name: "Grade 1", subjects: 3 },
-    { name: "Grade 2", subjects: 3 },
-    { name: "Grade 3", subjects: 4 },
-    { name: "Grade 4", subjects: 4 },
-  ]
-
-  const currentBoard = boards.find((b) => b.name === selectedBoard)
+  // Mock grade data structure
+  const grades = Array.from({ length: 12 }, (_, i) => ({
+    name: `Grade ${i + 1}`,
+    number: i + 1,
+    subjects: subjects.filter(s => s.grade_level === i + 1).length
+  }))
 
   return (
     <div className="space-y-6">
@@ -251,18 +253,18 @@ export default function ContentManagement({ boards: initialBoards }: ContentMana
               <label className="block text-sm font-medium text-gray-700 mb-2">Select Board</label>
               <Select value={selectedBoard} onValueChange={handleBoardChange}>
                 <SelectTrigger className="w-full">
-                  <SelectValue />
+                  <SelectValue placeholder="Select a board" />
                 </SelectTrigger>
                 <SelectContent>
                   {boards.map((board) => (
-                    <SelectItem key={board.name} value={board.name}>
+                    <SelectItem key={board.id} value={board.name}>
                       {board.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            {boards.length > 1 && (
+            {boards.length > 1 && selectedBoardId && (
               <Button
                 variant="outline"
                 size="sm"
@@ -276,48 +278,52 @@ export default function ContentManagement({ boards: initialBoards }: ContentMana
             )}
           </div>
 
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">{selectedBoard} Structure</h2>
+          {selectedBoard && (
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">{selectedBoard} Structure</h2>
 
-            <div className="space-y-4">
-              {grades.map((grade) => (
-                <div key={grade.name} className="border border-gray-200 rounded-lg">
-                  <div className="flex items-center justify-between p-4 bg-gray-50">
-                    <div className="flex items-center space-x-3">
-                      <button onClick={() => toggleGrade(grade.name)} className="text-gray-500">
-                        {expandedGrades[grade.name] ? (
-                          <ChevronDown className="h-4 w-4" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4" />
-                        )}
-                      </button>
-                      <span className="font-medium text-gray-900">{grade.name}</span>
-                      <Badge variant="secondary" className="bg-purple-100 text-purple-800">
-                        {grade.subjects} subjects
-                      </Badge>
+              <div className="space-y-4">
+                {grades.map((grade) => (
+                  <div key={grade.name} className="border border-gray-200 rounded-lg">
+                    <div className="flex items-center justify-between p-4 bg-gray-50">
+                      <div className="flex items-center space-x-3">
+                        <button onClick={() => toggleGrade(grade.name)} className="text-gray-500">
+                          {expandedGrades[grade.name] ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
+                          )}
+                        </button>
+                        <span className="font-medium text-gray-900">{grade.name}</span>
+                        <Badge variant="secondary" className="bg-purple-100 text-purple-800">
+                          {grade.subjects} subjects
+                        </Badge>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            setSubjectForm({ ...subjectForm, grade: grade.number.toString() })
+                            setShowAddSubjectModal(true)
+                          }}
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Add Subject
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Button variant="outline" size="sm">
-                        <Plus className="h-4 w-4 mr-1" />
-                        <span onClick={() => setShowAddSubjectModal(true)}>Add Subject</span>
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => confirmAction(() => console.log(`Edit ${grade.name}`))}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
 
-                  {expandedGrades[grade.name] && (
-                    <div className="p-4 space-y-3">
-                      {subjects.map((subject: any) => (
+                    {expandedGrades[grade.name] && (
+                      <div className="p-4 space-y-3">
+                        {subjects.filter(s => s.grade_level === grade.number).map((subject: any) => (
                           <div key={subject.id} className="border border-gray-200 rounded-lg">
                             <div className="flex items-center justify-between p-3 bg-gray-50">
                               <div className="flex items-center space-x-3">
-                                <button onClick={() => toggleSubject(subject.name)} className="text-gray-500">
+                                <button 
+                                  onClick={() => toggleSubject(subject.name, subject.id)} 
+                                  className="text-gray-500"
+                                >
                                   {expandedSubjects[subject.name] ? (
                                     <ChevronDown className="h-4 w-4" />
                                   ) : (
@@ -325,7 +331,9 @@ export default function ContentManagement({ boards: initialBoards }: ContentMana
                                   )}
                                 </button>
                                 <span className="font-medium text-gray-900">{subject.name}</span>
-                                <span className="text-sm text-gray-500">0 topics</span>
+                                <span className="text-sm text-gray-500">
+                                  {topics.filter(t => t.subject_id === subject.id).length} topics
+                                </span>
                               </div>
                               <div className="flex items-center space-x-2">
                                 <Button
@@ -335,12 +343,15 @@ export default function ContentManagement({ boards: initialBoards }: ContentMana
                                 >
                                   <Edit className="h-4 w-4" />
                                 </Button>
-                                <Button variant="ghost" size="sm">
-                                  <Plus className="h-4 w-4" />
-                                  <span onClick={() => {
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={() => {
                                     setTopicForm({ ...topicForm, subjectId: subject.id })
                                     setShowAddTopicModal(true)
-                                  }}>Add Topic</span>
+                                  }}
+                                >
+                                  <Plus className="h-4 w-4" />
                                 </Button>
                                 <Button
                                   variant="ghost"
@@ -388,19 +399,27 @@ export default function ContentManagement({ boards: initialBoards }: ContentMana
                                     </div>
                                   </div>
                                 ))}
+                                {topics.filter(t => t.subject_id === subject.id).length === 0 && (
+                                  <p className="text-sm text-gray-500 text-center py-4">No topics yet</p>
+                                )}
                               </div>
                             )}
                           </div>
                         ))}
-                    </div>
-                  )}
-                </div>
-              ))}
+                        {subjects.filter(s => s.grade_level === grade.number).length === 0 && (
+                          <p className="text-sm text-gray-500 text-center py-4">No subjects yet</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
+      {/* Modals */}
       <Dialog open={showContentModal} onOpenChange={setShowContentModal}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
@@ -416,7 +435,6 @@ export default function ContentManagement({ boards: initialBoards }: ContentMana
           </DialogHeader>
 
           <div className="space-y-6">
-            {/* Upload Files Section */}
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">Upload Files</h3>
@@ -431,7 +449,6 @@ export default function ContentManagement({ boards: initialBoards }: ContentMana
               </div>
             </div>
 
-            {/* Manual Content Section */}
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">Manual Content</h3>
@@ -443,11 +460,6 @@ export default function ContentManagement({ boards: initialBoards }: ContentMana
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Title: {currentContent.title}</label>
-                  <p className="text-sm text-gray-600">The content will be associated with this topic</p>
-                </div>
-
-                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Content</label>
                   <Textarea
                     value={currentContent.content}
@@ -456,24 +468,6 @@ export default function ContentManagement({ boards: initialBoards }: ContentMana
                     className="w-full"
                   />
                 </div>
-              </div>
-            </div>
-
-            {/* Current Content Display */}
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Current Content (1)</h3>
-              <div className="border border-gray-200 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-medium">{currentContent.title}</h4>
-                  <div className="flex items-center space-x-2">
-                    <Badge className="bg-blue-100 text-blue-800">Active</Badge>
-                    <Button variant="ghost" size="sm">
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                <p className="text-sm text-gray-600 mb-2">Created: 08/08/2025</p>
-                <p className="text-sm text-gray-800">{currentContent.content.substring(0, 200)}...</p>
               </div>
             </div>
           </div>

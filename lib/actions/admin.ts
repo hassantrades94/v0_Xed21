@@ -1,31 +1,47 @@
 "use server"
 
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
+import type { Database } from "@/lib/supabase/types"
 
-// User management actions
-export async function updateUserCoins(userId: string, newBalance: number) {
+type User = Database['public']['Tables']['users']['Row']
+type AdminUser = Database['public']['Tables']['admin_users']['Row']
+type Board = Database['public']['Tables']['boards']['Row']
+type Subject = Database['public']['Tables']['subjects']['Row']
+type Topic = Database['public']['Tables']['topics']['Row']
+
+// Authentication helper
+async function requireAdminAuth() {
   const supabase = await createClient()
-
-  // Check admin authentication
+  
   const {
     data: { user },
     error: authError,
   } = await supabase.auth.getUser()
+  
   if (authError || !user) {
     redirect("/admin/login")
   }
 
+  // Check if user is admin
   const { data: adminUser, error: adminError } = await supabase
     .from("admin_users")
     .select("*")
-    .eq("id", user.id)
+    .eq("email", user.email)
     .single()
 
   if (adminError || !adminUser) {
     redirect("/admin/login")
   }
+
+  return { user, adminUser }
+}
+
+// User management actions
+export async function updateUserCoins(userId: string, newBalance: number) {
+  await requireAdminAuth()
+  const supabase = await createAdminClient()
 
   try {
     // Get current balance
@@ -72,7 +88,8 @@ export async function updateUserCoins(userId: string, newBalance: number) {
 }
 
 export async function suspendUser(userId: string) {
-  const supabase = await createClient()
+  await requireAdminAuth()
+  const supabase = await createAdminClient()
 
   try {
     const { error } = await supabase
@@ -93,7 +110,8 @@ export async function suspendUser(userId: string) {
 }
 
 export async function deleteUser(userId: string) {
-  const supabase = await createClient()
+  await requireAdminAuth()
+  const supabase = await createAdminClient()
 
   try {
     const { error } = await supabase
@@ -113,7 +131,7 @@ export async function deleteUser(userId: string) {
   }
 }
 
-export async function getUsers() {
+export async function getUsers(): Promise<User[]> {
   const supabase = await createClient()
 
   try {
@@ -166,7 +184,7 @@ export async function getDashboardStats() {
       .order("created_at", { ascending: false })
       .limit(5)
 
-    // Get recent questions
+    // Get recent questions with user and topic info
     const { data: recentQuestions } = await supabase
       .from("questions")
       .select(`
@@ -203,7 +221,7 @@ export async function getDashboardStats() {
 }
 
 // Content management actions
-export async function getBoards() {
+export async function getBoards(): Promise<Board[]> {
   const supabase = await createClient()
 
   try {
@@ -225,7 +243,8 @@ export async function getBoards() {
 }
 
 export async function createBoard(data: { name: string; code: string; description?: string }) {
-  const supabase = await createClient()
+  await requireAdminAuth()
+  const supabase = await createAdminClient()
 
   try {
     const { error } = await supabase.from("boards").insert({
@@ -247,7 +266,8 @@ export async function createBoard(data: { name: string; code: string; descriptio
 }
 
 export async function updateBoard(id: string, data: { name: string; code: string; description?: string }) {
-  const supabase = await createClient()
+  await requireAdminAuth()
+  const supabase = await createAdminClient()
 
   try {
     const { error } = await supabase
@@ -272,7 +292,8 @@ export async function updateBoard(id: string, data: { name: string; code: string
 }
 
 export async function deleteBoard(id: string) {
-  const supabase = await createClient()
+  await requireAdminAuth()
+  const supabase = await createAdminClient()
 
   try {
     const { error } = await supabase.from("boards").delete().eq("id", id)
@@ -289,7 +310,7 @@ export async function deleteBoard(id: string) {
   }
 }
 
-export async function getSubjectsForBoard(boardId: string, grade: number) {
+export async function getSubjectsForBoard(boardId: string, grade: number): Promise<Subject[]> {
   const supabase = await createClient()
 
   try {
@@ -313,7 +334,8 @@ export async function getSubjectsForBoard(boardId: string, grade: number) {
 }
 
 export async function createSubject(data: { name: string; code: string; boardId: string; gradeLevel: number }) {
-  const supabase = await createClient()
+  await requireAdminAuth()
+  const supabase = await createAdminClient()
 
   try {
     const { error } = await supabase.from("subjects").insert({
@@ -335,7 +357,7 @@ export async function createSubject(data: { name: string; code: string; boardId:
   }
 }
 
-export async function getTopicsForSubject(subjectId: string) {
+export async function getTopicsForSubject(subjectId: string): Promise<Topic[]> {
   const supabase = await createClient()
 
   try {
@@ -358,7 +380,8 @@ export async function getTopicsForSubject(subjectId: string) {
 }
 
 export async function createTopic(data: { name: string; description?: string; subjectId: string }) {
-  const supabase = await createClient()
+  await requireAdminAuth()
+  const supabase = await createAdminClient()
 
   try {
     const { error } = await supabase.from("topics").insert({
@@ -402,7 +425,8 @@ export async function getAllAIRules() {
 }
 
 export async function toggleAIRule(ruleId: string, ruleType: string) {
-  const supabase = await createClient()
+  await requireAdminAuth()
+  const supabase = await createAdminClient()
 
   try {
     // Get current status
@@ -435,7 +459,8 @@ export async function toggleAIRule(ruleId: string, ruleType: string) {
 }
 
 export async function updateAIRule(ruleId: string, ruleType: string, name: string, description: string) {
-  const supabase = await createClient()
+  await requireAdminAuth()
+  const supabase = await createAdminClient()
 
   try {
     const { error } = await supabase
@@ -481,7 +506,8 @@ export async function getAllBloomSamples() {
 }
 
 export async function createBloomSample(bloomLevel: string, grade: string, subject: string, question: string) {
-  const supabase = await createClient()
+  await requireAdminAuth()
+  const supabase = await createAdminClient()
 
   try {
     const { error } = await supabase.from("bloom_samples").insert({
@@ -506,7 +532,8 @@ export async function createBloomSample(bloomLevel: string, grade: string, subje
 }
 
 export async function updateBloomSample(sampleId: string, bloomLevel: string, grade: string, subject: string, question: string) {
-  const supabase = await createClient()
+  await requireAdminAuth()
+  const supabase = await createAdminClient()
 
   try {
     const { error } = await supabase
@@ -533,7 +560,8 @@ export async function updateBloomSample(sampleId: string, bloomLevel: string, gr
 }
 
 export async function deleteBloomSample(sampleId: string) {
-  const supabase = await createClient()
+  await requireAdminAuth()
+  const supabase = await createAdminClient()
 
   try {
     const { error } = await supabase

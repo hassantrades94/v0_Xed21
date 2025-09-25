@@ -6,6 +6,11 @@ import { groq } from "@ai-sdk/groq"
 import { openai } from "@ai-sdk/openai"
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
+import type { Database } from "@/lib/supabase/types"
+
+type Board = Database['public']['Tables']['boards']['Row']
+type Subject = Database['public']['Tables']['subjects']['Row']
+type Topic = Database['public']['Tables']['topics']['Row']
 
 interface AIProvider {
   name: "groq" | "openrouter"
@@ -58,21 +63,13 @@ const processLearningOutcome = (outcome: string): { actionVerbs: string[]; focus
 export async function generateQuestions(formData: FormData) {
   const supabase = await createClient()
 
-  const mockUser = {
-    id: "demo-user-123",
-    email: "geology.cupb16@gmail.com",
-    user_metadata: { full_name: "Mamun" },
-  }
-
-  // Check authentication - use mock data in demo environment
+  // Check authentication
   const {
     data: { user },
     error: authError,
   } = await supabase.auth.getUser()
 
-  const currentUser = user || mockUser // Use mock user if auth fails
-
-  if (!currentUser) {
+  if (authError || !user) {
     redirect("/auth/login")
   }
 
@@ -102,35 +99,22 @@ export async function generateQuestions(formData: FormData) {
   const coinCost = bloomCosts[bloomLevel.toLowerCase() as keyof typeof bloomCosts] || 7
   const totalCost = count * coinCost
 
-  const mockWalletBalance = 9500
-
   // Get user's wallet balance
   const { data: userData, error: userError } = await supabase
     .from("users")
     .select("wallet_balance")
-    .eq("id", currentUser.id)
+    .eq("id", user.id)
     .single()
 
-  const walletBalance = userData?.wallet_balance || mockWalletBalance
+  if (userError || !userData) {
+    throw new Error("User not found")
+  }
 
-  if (walletBalance < totalCost) {
+  if (userData.wallet_balance < totalCost) {
     throw new Error("Insufficient wallet balance")
   }
 
-  const mockContextData = {
-    name: "CBSE/NCERT",
-    subjects: {
-      name: "Science",
-      topics: {
-        name: "Exploring Magnets",
-        description: "Understanding magnetic properties and behavior",
-        content: "Magnets have two poles - north and south. Like poles repel, unlike poles attract.",
-        learning_objectives: "Students will understand magnetic properties and interactions",
-        key_concepts: "Magnetic poles, attraction, repulsion, magnetic field",
-      },
-    },
-  }
-
+  // Get curriculum context
   const { data: contextData, error: contextError } = await supabase
     .from("boards")
     .select(`
@@ -139,10 +123,7 @@ export async function generateQuestions(formData: FormData) {
         name,
         topics!inner(
           name,
-          description,
-          content,
-          learning_objectives,
-          key_concepts
+          description
         )
       )
     `)
@@ -151,80 +132,40 @@ export async function generateQuestions(formData: FormData) {
     .eq("subjects.topics.id", topicId)
     .single()
 
-  const curriculumData = contextData || mockContextData
-  const board = curriculumData.name
-  const subject = curriculumData.subjects.name
-  const topic = curriculumData.subjects.topics.name
-  const topicDescription = curriculumData.subjects.topics.description
-  const topicContent = curriculumData.subjects.topics.content
-  const learningObjectives = curriculumData.subjects.topics.learning_objectives || ""
-  const keyConcepts = curriculumData.subjects.topics.key_concepts || ""
+  if (contextError || !contextData) {
+    throw new Error("Failed to load curriculum context")
+  }
 
-  // Use mock AI rules for demo environment
-  const mockAIRules = [
-    {
-      rule_type: "global",
-      rule_content: "Questions should be clear and concise",
-      is_active: true,
-      question_type: null,
-    },
-    {
-      rule_type: "question_type",
-      rule_content: "Multiple choice questions should have 4 options",
-      is_active: true,
-      question_type: questionType.toLowerCase(),
-    },
-  ]
+  const board = contextData.name
+  const subject = contextData.subjects.name
+  const topic = contextData.subjects.topics.name
+  const topicDescription = contextData.subjects.topics.description
 
+  // Get AI rules
   const { data: aiRules } = await supabase
     .from("ai_rules")
-    .select("rule_type, rule_content, is_active, question_type")
+    .select("rule_type, description, is_active")
     .eq("is_active", true)
 
-  const rulesData = aiRules?.length ? aiRules : mockAIRules
-
   const globalRules =
-    rulesData
+    aiRules
       ?.filter((rule) => rule.rule_type === "global")
-      .map((rule) => rule.rule_content)
-      .join("\n") || ""
-  const questionTypeRules =
-    rulesData
-      ?.filter((rule) => rule.question_type === questionType.toLowerCase())
-      .map((rule) => rule.rule_content)
-      .join("\n") || ""
-  const bloomRules =
-    rulesData
-      ?.filter(
-        (rule) => rule.rule_type === "bloom" && rule.rule_content.toLowerCase().includes(bloomLevel.toLowerCase()),
-      )
-      .map((rule) => rule.rule_content)
+      .map((rule) => rule.description)
       .join("\n") || ""
 
-  // Use mock Bloom samples for demo environment
-  const mockBloomSamples = [
-    {
-      sample_question: "What is the capital of India?",
-      explanation: "This tests basic recall of geographical facts",
-      grade: gradeLevel,
-      subject: subject.toLowerCase(),
-    },
-  ]
-
+  // Get Bloom samples
   const { data: bloomSamples } = await supabase
     .from("bloom_samples")
-    .select("sample_question, explanation, grade, subject")
+    .select("sample_question, explanation, grade_level, subject")
     .eq("bloom_level", bloomLevel.toLowerCase())
     .eq("subject", subject.toLowerCase())
-    .gte("grade", Math.max(1, gradeLevel - 2))
-    .lte("grade", Math.min(12, gradeLevel + 2))
+    .gte("grade_level", Math.max(1, gradeLevel - 2))
+    .lte("grade_level", Math.min(12, gradeLevel + 2))
     .limit(3)
 
-  const samplesData = bloomSamples?.length ? bloomSamples : mockBloomSamples
-
   const sampleQuestions =
-    samplesData
-      ?.map((sample) => `Grade ${sample.grade} Sample: ${sample.sample_question}\nExplanation: ${sample.explanation}`)
+    bloomSamples
+      ?.map((sample) => `Grade ${sample.grade_level} Sample: ${sample.sample_question}\nExplanation: ${sample.explanation}`)
       .join("\n\n") || ""
 
   const { actionVerbs, focusAreas } = processLearningOutcome(learningOutcome)
@@ -236,7 +177,7 @@ export async function generateQuestions(formData: FormData) {
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      console.log(`[v0] Question generation attempt ${attempt}/${maxAttempts}`)
+      console.log(`Question generation attempt ${attempt}/${maxAttempts}`)
 
       const prompt = `You are an expert educational content creator specializing in ${board} curriculum for Grade ${gradeLevel}. Generate ${count} high-quality ${questionType} questions.
 
@@ -246,19 +187,15 @@ Subject: ${subject}
 Topic: ${topic}
 Grade Level: ${gradeLevel}
 Description: ${topicDescription}
-Learning Objectives: ${learningObjectives}
-Key Concepts: ${keyConcepts}
-${topicContent ? `Detailed Content: ${topicContent}` : ""}
+Learning Outcome Focus: ${learningOutcome}
+Action Verbs to Emphasize: ${actionVerbs.join(", ")}
+Focus Areas: ${focusAreas.join(", ")}
 
 COGNITIVE REQUIREMENTS:
 - Bloom's Taxonomy Level: ${bloomLevel}
 - Grade-Specific Guidance: ${cognitiveGuidance}
-- Learning Outcome Focus: ${learningOutcome}
-- Action Verbs to Emphasize: ${actionVerbs.join(", ")}
-- Focus Areas: ${focusAreas.join(", ")}
 
 QUESTION TYPE: ${questionType}
-${questionType !== "remembering" ? "VISUAL REQUIREMENT: Include scenarios with charts, diagrams, or data tables where appropriate." : ""}
 
 STRICT FORMATTING RULES:
 1. CHARACTER NAMING: Use diverse, culturally appropriate names (Arjun, Priya, Ahmed, Sarah, etc.)
@@ -269,14 +206,7 @@ STRICT FORMATTING RULES:
 6. MEASUREMENTS: Use metric system (meters, kilograms, Celsius)
 
 AI GENERATION RULES:
-GLOBAL RULES:
 ${globalRules}
-
-QUESTION TYPE SPECIFIC RULES:
-${questionTypeRules}
-
-BLOOM LEVEL SPECIFIC RULES:
-${bloomRules}
 
 REFERENCE EXAMPLES (adjust complexity for Grade ${gradeLevel}):
 ${sampleQuestions}
@@ -285,23 +215,20 @@ OUTPUT FORMAT - STRICT JSON:
 [
   {
     "question": "Complete question text with proper formatting and scenarios",
-    "options": ["Option A text", "Option B text", "Option C text", "Option D text"], // Only for MCQ types
-    "correct_answer": "Exact correct answer or key",
+    "options": ["Option A text", "Option B text", "Option C text", "Option D text"],
+    "correct_answer": "A",
     "option_explanations": {
-      "A": "Correct./Incorrect. Detailed explanation of why this option is right/wrong",
-      "B": "Correct./Incorrect. Detailed explanation of why this option is right/wrong",
-      "C": "Correct./Incorrect. Detailed explanation of why this option is right/wrong",
-      "D": "Correct./Incorrect. Detailed explanation of why this option is right/wrong"
-    }, // Only for MCQ types
+      "A": "Correct. Detailed explanation of why this option is right",
+      "B": "Incorrect. Detailed explanation of why this option is wrong",
+      "C": "Incorrect. Detailed explanation of why this option is wrong",
+      "D": "Incorrect. Detailed explanation of why this option is wrong"
+    },
     "explanation": "Comprehensive explanation focusing on the learning outcome and cognitive level",
     "bloom_level": "${bloomLevel}",
-    "confidence_score": 85, // Integer 70-95 based on content alignment and question quality
-    "difficulty_indicator": "Easy/Medium/Hard", // Based on grade level and cognitive load
-    "estimated_time": 2, // Minutes to solve realistically
-    "marks": 1, // Standard marks for this question type
-    "visual_elements": "Description of required charts/diagrams if applicable",
-    "key_concepts_tested": ["concept1", "concept2"], // From curriculum content
-    "action_verbs_used": ["${actionVerbs[0] || "understand"}"] // From learning outcome
+    "confidence_score": 85,
+    "difficulty_indicator": "Medium",
+    "estimated_time": 2,
+    "marks": 1
   }
 ]
 
@@ -335,25 +262,19 @@ CRITICAL: Generate exactly ${count} questions. Ensure each question tests differ
         if (jsonMatch) {
           questions = JSON.parse(jsonMatch[0])
         } else {
-          // Try to find individual JSON objects
-          const objectMatches = text.match(/\{[\s\S]*?\}/g)
-          if (objectMatches && objectMatches.length > 0) {
-            questions = objectMatches.map((match) => JSON.parse(match))
-          } else {
-            throw new Error("No valid JSON found in AI response")
-          }
+          throw new Error("No valid JSON found in AI response")
         }
       }
 
       if (Array.isArray(questions) && questions.length > 0) {
-        console.log(`[v0] Successfully generated ${questions.length} questions on attempt ${attempt}`)
+        console.log(`Successfully generated ${questions.length} questions on attempt ${attempt}`)
         break
       } else {
         throw new Error("Generated questions array is empty or invalid")
       }
     } catch (error) {
       lastError = error instanceof Error ? error.message : "Unknown error"
-      console.log(`[v0] Attempt ${attempt} failed: ${lastError}`)
+      console.log(`Attempt ${attempt} failed: ${lastError}`)
 
       if (attempt === maxAttempts) {
         throw new Error(`Failed to generate questions after ${maxAttempts} attempts. Last error: ${lastError}`)
@@ -364,29 +285,19 @@ CRITICAL: Generate exactly ${count} questions. Ensure each question tests differ
     }
   }
 
+  // Insert questions into database
   const questionsToInsert = questions.slice(0, count).map((q: any) => ({
-    user_id: currentUser.id,
-    board_id: boardId,
-    subject_id: subjectId,
+    user_id: user.id,
     topic_id: topicId,
-    question_type: questionType,
-    bloom_level: bloomLevel,
     question_text: q.question,
+    question_type: questionType as Database['public']['Enums']['question_type'],
+    difficulty_level: (q.difficulty_indicator?.toLowerCase() || "medium") as Database['public']['Enums']['difficulty_level'],
     options: q.options || null,
     correct_answer: q.correct_answer,
     explanation: q.explanation,
-    option_explanations: q.option_explanations || null,
-    confidence_score: q.confidence_score || 85,
-    difficulty_indicator: q.difficulty_indicator || "Medium",
-    estimated_time: q.estimated_time || 2,
-    marks: q.marks || 1,
-    visual_elements: q.visual_elements || null,
-    key_concepts_tested: q.key_concepts_tested || [],
-    action_verbs_used: q.action_verbs_used || [],
-    status: "approved", // Auto-approve for demo
-    cost: coinCost,
-    learning_outcome: learningOutcome,
-    grade_level: gradeLevel,
+    bloom_taxonomy_level: q.bloom_level,
+    estimated_time_minutes: q.estimated_time || 2,
+    is_approved: true, // Auto-approve for demo
   }))
 
   const { data: insertedQuestions, error: insertError } = await supabase
@@ -394,22 +305,34 @@ CRITICAL: Generate exactly ${count} questions. Ensure each question tests differ
     .insert(questionsToInsert)
     .select()
 
-  // Use mock inserted questions if database fails
-  const finalQuestions = insertedQuestions || questionsToInsert.map((q, index) => ({ ...q, id: `demo-q-${index}` }))
+  if (insertError) {
+    console.error("Error inserting questions:", insertError)
+    // Continue with mock data for demo
+  }
 
+  // Update wallet balance
   const { error: walletError } = await supabase
     .from("users")
-    .update({ wallet_balance: walletBalance - totalCost })
-    .eq("id", currentUser.id)
+    .update({ wallet_balance: userData.wallet_balance - totalCost })
+    .eq("id", user.id)
 
-  // Mock transaction record
-  await supabase.from("wallet_transactions").insert({
-    user_id: currentUser.id,
-    type: "debit",
+  if (walletError) {
+    console.error("Error updating wallet:", walletError)
+  }
+
+  // Record transaction
+  const { error: transactionError } = await supabase.from("wallet_transactions").insert({
+    user_id: user.id,
+    transaction_type: "debit",
     amount: totalCost,
     description: `Generated ${count} ${bloomLevel} ${questionType} questions`,
     status: "completed",
+    balance_after: userData.wallet_balance - totalCost,
   })
+
+  if (transactionError) {
+    console.error("Error recording transaction:", transactionError)
+  }
 
   revalidatePath("/dashboard")
   revalidatePath("/dashboard/generate")
@@ -419,17 +342,86 @@ CRITICAL: Generate exactly ${count} questions. Ensure each question tests differ
 
   return {
     success: true,
-    message: `Successfully generated ${finalQuestions.length} questions using ${totalCost} coins`,
-    questions: finalQuestions,
+    message: `Successfully generated ${count} questions using ${totalCost} coins`,
+    questions: insertedQuestions || questionsToInsert,
     cost: totalCost,
     bloom_level: bloomLevel,
+  }
+}
+
+export async function getBoards(): Promise<Board[]> {
+  const supabase = await createClient()
+
+  try {
+    const { data: boards, error } = await supabase
+      .from("boards")
+      .select("*")
+      .order("name")
+
+    if (error) {
+      console.error("Error fetching boards:", error)
+      return []
+    }
+
+    return boards || []
+  } catch (error) {
+    console.error("Error in getBoards:", error)
+    return []
+  }
+}
+
+export async function getSubjectsByBoard(boardId: string, gradeLevel: number): Promise<Subject[]> {
+  const supabase = await createClient()
+
+  try {
+    const { data: subjects, error } = await supabase
+      .from("subjects")
+      .select("*")
+      .eq("board_id", boardId)
+      .eq("grade_level", gradeLevel)
+      .order("name")
+
+    if (error) {
+      console.error("Error fetching subjects:", error)
+      return []
+    }
+
+    return subjects || []
+  } catch (error) {
+    console.error("Error in getSubjectsByBoard:", error)
+    return []
+  }
+}
+
+export async function getTopicsBySubject(subjectId: string, boardId: string, gradeLevel: number): Promise<Topic[]> {
+  const supabase = await createClient()
+
+  try {
+    const { data: topics, error } = await supabase
+      .from("topics")
+      .select("*")
+      .eq("subject_id", subjectId)
+      .order("order_index")
+
+    if (error) {
+      console.error("Error fetching topics:", error)
+      return []
+    }
+
+    return topics || []
+  } catch (error) {
+    console.error("Error in getTopicsBySubject:", error)
+    return []
   }
 }
 
 export async function approveQuestion(questionId: string) {
   const supabase = await createClient()
 
-  const { error } = await supabase.from("questions").update({ status: "approved" }).eq("id", questionId)
+  const { error } = await supabase
+    .from("questions")
+    .update({ is_approved: true })
+    .eq("id", questionId)
 
   if (error) {
     throw new Error("Failed to approve question")
@@ -445,8 +437,8 @@ export async function rejectQuestion(questionId: string, reason?: string) {
   const { error } = await supabase
     .from("questions")
     .update({
-      status: "rejected",
-      rejection_reason: reason,
+      is_approved: false,
+      // Note: rejection_reason field would need to be added to schema
     })
     .eq("id", questionId)
 
@@ -456,103 +448,4 @@ export async function rejectQuestion(questionId: string, reason?: string) {
 
   revalidatePath("/admin/questions")
   return { success: true }
-}
-
-export async function getBoards() {
-  const supabase = await createClient()
-
-  try {
-    const { data: boards, error } = await supabase
-      .from("boards")
-      .select("*")
-      .order("name")
-
-    if (error) {
-      console.error("Error fetching boards:", error)
-      return [
-        { id: "cbse", name: "CBSE/NCERT" },
-        { id: "icse", name: "ICSE/CISCE" },
-        { id: "state", name: "State Boards" },
-      ]
-    }
-
-    return boards || []
-  } catch (error) {
-    console.error("Error in getBoards:", error)
-    return [
-      { id: "cbse", name: "CBSE/NCERT" },
-      { id: "icse", name: "ICSE/CISCE" },
-      { id: "state", name: "State Boards" },
-    ]
-  }
-}
-
-export async function getSubjectsByBoard(boardId: string, gradeLevel: number) {
-  const supabase = await createClient()
-
-  try {
-    const { data: subjects, error } = await supabase
-      .from("subjects")
-      .select("*")
-      .eq("board_id", boardId)
-      .eq("grade_level", gradeLevel)
-      .order("name")
-
-    if (error) {
-      console.error("Error fetching subjects:", error)
-      return [
-        { id: "cbse-science-6", name: "Science" },
-        { id: "cbse-math-6", name: "Mathematics" },
-        { id: "cbse-english-6", name: "English" },
-        { id: "cbse-hindi-6", name: "Hindi" },
-        { id: "cbse-sst-6", name: "Social Science" },
-      ]
-    }
-
-    return subjects || []
-  } catch (error) {
-    console.error("Error in getSubjectsByBoard:", error)
-    return [
-      { id: "cbse-science-6", name: "Science" },
-      { id: "cbse-math-6", name: "Mathematics" },
-      { id: "cbse-english-6", name: "English" },
-      { id: "cbse-hindi-6", name: "Hindi" },
-      { id: "cbse-sst-6", name: "Social Science" },
-    ]
-  }
-}
-
-export async function getTopicsBySubject(subjectId: string, boardId: string, gradeLevel: number) {
-  const supabase = await createClient()
-
-  try {
-    const { data: topics, error } = await supabase
-      .from("topics")
-      .select("*")
-      .eq("subject_id", subjectId)
-      .order("order_index")
-
-    if (error) {
-      console.error("Error fetching topics:", error)
-      return [
-        { id: "exploring-magnets", name: "Exploring Magnets" },
-        { id: "light-shadows", name: "Light and Shadows" },
-        { id: "motion-measurement", name: "Motion and Measurement" },
-        { id: "materials-around-us", name: "Materials Around Us" },
-        { id: "living-organisms", name: "Living Organisms and Their Surroundings" },
-        { id: "components-food", name: "Components of Food" },
-      ]
-    }
-    return topics || []
-  } catch (error) {
-    console.error("Error in getTopicsBySubject:", error)
-    return [
-      { id: "exploring-magnets", name: "Exploring Magnets" },
-      { id: "light-shadows", name: "Light and Shadows" },
-      { id: "motion-measurement", name: "Motion and Measurement" },
-      { id: "materials-around-us", name: "Materials Around Us" },
-      { id: "living-organisms", name: "Living Organisms and Their Surroundings" },
-      { id: "components-food", name: "Components of Food" },
-    ]
-  }
 }

@@ -3,9 +3,12 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
+import type { Database } from "@/lib/supabase/types"
+
+type WalletTransaction = Database['public']['Tables']['wallet_transactions']['Row']
 
 export async function topUpWallet(formData: FormData) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   // Check authentication
   const {
@@ -41,7 +44,10 @@ export async function topUpWallet(formData: FormData) {
 
     // Update wallet balance
     const newBalance = userData.wallet_balance + amount
-    const { error: updateError } = await supabase.from("users").update({ wallet_balance: newBalance }).eq("id", user.id)
+    const { error: updateError } = await supabase
+      .from("users")
+      .update({ wallet_balance: newBalance })
+      .eq("id", user.id)
 
     if (updateError) {
       throw new Error("Failed to update wallet balance")
@@ -50,7 +56,7 @@ export async function topUpWallet(formData: FormData) {
     // Record transaction
     const { error: transactionError } = await supabase.from("wallet_transactions").insert({
       user_id: user.id,
-      type: "credit",
+      transaction_type: "credit",
       amount: amount,
       description: `Wallet top-up via ${paymentMethod}`,
       status: "completed",
@@ -77,8 +83,8 @@ export async function topUpWallet(formData: FormData) {
   }
 }
 
-export async function getWalletTransactions(limit = 50) {
-  const supabase = createClient()
+export async function getWalletTransactions(limit = 50): Promise<{ transactions: WalletTransaction[]; error: string | null }> {
+  const supabase = await createClient()
 
   const {
     data: { user },
@@ -99,11 +105,11 @@ export async function getWalletTransactions(limit = 50) {
     return { transactions: [], error: error.message }
   }
 
-  return { transactions, error: null }
+  return { transactions: transactions || [], error: null }
 }
 
 export async function getWalletStats() {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   const {
     data: { user },
@@ -115,7 +121,7 @@ export async function getWalletStats() {
 
   const { data: transactions, error } = await supabase
     .from("wallet_transactions")
-    .select("type, amount, reference_type")
+    .select("transaction_type, amount, reference_type")
     .eq("user_id", user.id)
     .eq("status", "completed")
 
@@ -123,12 +129,9 @@ export async function getWalletStats() {
     return { stats: null, error: error.message }
   }
 
-  const totalSpent = transactions.filter((t) => t.type === "debit").reduce((sum, t) => sum + t.amount, 0)
-
-  const totalAdded = transactions.filter((t) => t.type === "credit").reduce((sum, t) => sum + t.amount, 0)
-
-  const questionBatches = transactions.filter((t) => t.reference_type === "question_generation").length
-
+  const totalSpent = transactions?.filter((t) => t.transaction_type === "debit").reduce((sum, t) => sum + t.amount, 0) || 0
+  const totalAdded = transactions?.filter((t) => t.transaction_type === "credit").reduce((sum, t) => sum + t.amount, 0) || 0
+  const questionBatches = transactions?.filter((t) => t.reference_type === "question_generation").length || 0
   const avgPerBatch = questionBatches > 0 ? totalSpent / questionBatches : 0
 
   return {
