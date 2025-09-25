@@ -1,11 +1,68 @@
+"use server"
+
+import { createClient } from "@/lib/supabase/server"
+import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 
 // User management actions
 export async function updateUserCoins(userId: string, newBalance: number) {
+  const supabase = await createClient()
+
+  // Check admin authentication
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) {
+    redirect("/admin/login")
+  }
+
+  const { data: adminUser, error: adminError } = await supabase
+    .from("admin_users")
+    .select("*")
+    .eq("id", user.id)
+    .single()
+
+  if (adminError || !adminUser) {
+    redirect("/admin/login")
+  }
+
   try {
-    const { updateUserWalletBalance } = await import("@/lib/database/sqlite")
-    await updateUserWalletBalance(userId, newBalance)
-    
+    // Get current balance
+    const { data: userData, error: userError } = await supabase
+      .from("users")
+      .select("wallet_balance")
+      .eq("id", userId)
+      .single()
+
+    if (userError || !userData) {
+      throw new Error("User not found")
+    }
+
+    // Update wallet balance
+    const { error: updateError } = await supabase
+      .from("users")
+      .update({ wallet_balance: newBalance })
+      .eq("id", userId)
+
+    if (updateError) {
+      throw new Error("Failed to update wallet balance")
+    }
+
+    // Record transaction
+    const { error: transactionError } = await supabase.from("wallet_transactions").insert({
+      user_id: userId,
+      transaction_type: "credit",
+      amount: newBalance - userData.wallet_balance,
+      description: "Admin balance adjustment",
+      status: "completed",
+      balance_after: newBalance,
+    })
+
+    if (transactionError) {
+      console.error("Transaction recording failed:", transactionError)
+    }
+
     revalidatePath("/admin/users")
     return { success: true, message: "User coins updated successfully" }
   } catch (error) {
@@ -15,10 +72,18 @@ export async function updateUserCoins(userId: string, newBalance: number) {
 }
 
 export async function suspendUser(userId: string) {
+  const supabase = await createClient()
+
   try {
-    const { suspendUserAccount } = await import("@/lib/database/sqlite")
-    await suspendUserAccount(userId)
-    
+    const { error } = await supabase
+      .from("users")
+      .update({ is_active: false })
+      .eq("id", userId)
+
+    if (error) {
+      throw new Error("Failed to suspend user")
+    }
+
     revalidatePath("/admin/users")
     return { success: true, message: "User suspended successfully" }
   } catch (error) {
@@ -28,10 +93,18 @@ export async function suspendUser(userId: string) {
 }
 
 export async function deleteUser(userId: string) {
+  const supabase = await createClient()
+
   try {
-    const { deleteUserAccount } = await import("@/lib/database/sqlite")
-    await deleteUserAccount(userId)
-    
+    const { error } = await supabase
+      .from("users")
+      .delete()
+      .eq("id", userId)
+
+    if (error) {
+      throw new Error("Failed to delete user")
+    }
+
     revalidatePath("/admin/users")
     return { success: true, message: "User deleted successfully" }
   } catch (error) {
@@ -41,9 +114,20 @@ export async function deleteUser(userId: string) {
 }
 
 export async function getUsers() {
+  const supabase = await createClient()
+
   try {
-    const { getAllUsers } = await import("@/lib/database/sqlite")
-    return await getAllUsers()
+    const { data: users, error } = await supabase
+      .from("users")
+      .select("id, full_name, email, wallet_balance, is_active, created_at")
+      .order("created_at", { ascending: false })
+
+    if (error) {
+      console.error("Error fetching users:", error)
+      return []
+    }
+
+    return users || []
   } catch (error) {
     console.error("Error fetching users:", error)
     return []
@@ -51,9 +135,60 @@ export async function getUsers() {
 }
 
 export async function getDashboardStats() {
+  const supabase = await createClient()
+
   try {
-    const { getAdminStats } = await import("@/lib/database/sqlite")
-    return await getAdminStats()
+    // Get total users count
+    const { count: totalUsers } = await supabase
+      .from("users")
+      .select("*", { count: "exact", head: true })
+
+    // Get total questions count
+    const { count: totalQuestions } = await supabase
+      .from("questions")
+      .select("*", { count: "exact", head: true })
+
+    // Get pending questions count
+    const { count: pendingQuestions } = await supabase
+      .from("questions")
+      .select("*", { count: "exact", head: true })
+      .eq("is_approved", false)
+
+    // Get total requests count
+    const { count: totalRequests } = await supabase
+      .from("question_requests")
+      .select("*", { count: "exact", head: true })
+
+    // Get recent users
+    const { data: recentUsers } = await supabase
+      .from("users")
+      .select("id, full_name, email, created_at, is_active")
+      .order("created_at", { ascending: false })
+      .limit(5)
+
+    // Get recent questions
+    const { data: recentQuestions } = await supabase
+      .from("questions")
+      .select(`
+        id, question_text, is_approved, created_at,
+        users!inner(full_name),
+        topics!inner(name)
+      `)
+      .order("created_at", { ascending: false })
+      .limit(5)
+
+    return {
+      totalUsers: totalUsers || 0,
+      totalQuestions: totalQuestions || 0,
+      pendingQuestions: pendingQuestions || 0,
+      totalRequests: totalRequests || 0,
+      recentUsers: recentUsers || [],
+      recentQuestions: (recentQuestions || []).map(q => ({
+        ...q,
+        user_name: q.users?.full_name,
+        topic_name: q.topics?.name
+      }))
+    }
   } catch (error) {
     console.error("Error fetching dashboard stats:", error)
     return {
@@ -69,9 +204,20 @@ export async function getDashboardStats() {
 
 // Content management actions
 export async function getBoards() {
+  const supabase = await createClient()
+
   try {
-    const { getAllBoards } = await import("@/lib/database/sqlite")
-    return await getAllBoards()
+    const { data: boards, error } = await supabase
+      .from("boards")
+      .select("*")
+      .order("name")
+
+    if (error) {
+      console.error("Error fetching boards:", error)
+      return []
+    }
+
+    return boards || []
   } catch (error) {
     console.error("Error fetching boards:", error)
     return []
@@ -79,10 +225,19 @@ export async function getBoards() {
 }
 
 export async function createBoard(data: { name: string; code: string; description?: string }) {
+  const supabase = await createClient()
+
   try {
-    const { createBoard: createBoardDB } = await import("@/lib/database/sqlite")
-    await createBoardDB(data.name, data.code, data.description)
-    
+    const { error } = await supabase.from("boards").insert({
+      name: data.name,
+      code: data.code,
+      description: data.description,
+    })
+
+    if (error) {
+      throw new Error("Failed to create board")
+    }
+
     revalidatePath("/admin/content")
     return { success: true, message: "Board created successfully" }
   } catch (error) {
@@ -92,10 +247,22 @@ export async function createBoard(data: { name: string; code: string; descriptio
 }
 
 export async function updateBoard(id: string, data: { name: string; code: string; description?: string }) {
+  const supabase = await createClient()
+
   try {
-    const { updateBoard: updateBoardDB } = await import("@/lib/database/sqlite")
-    await updateBoardDB(id, data.name, data.code, data.description)
-    
+    const { error } = await supabase
+      .from("boards")
+      .update({
+        name: data.name,
+        code: data.code,
+        description: data.description,
+      })
+      .eq("id", id)
+
+    if (error) {
+      throw new Error("Failed to update board")
+    }
+
     revalidatePath("/admin/content")
     return { success: true, message: "Board updated successfully" }
   } catch (error) {
@@ -105,10 +272,15 @@ export async function updateBoard(id: string, data: { name: string; code: string
 }
 
 export async function deleteBoard(id: string) {
+  const supabase = await createClient()
+
   try {
-    const { deleteBoard: deleteBoardDB } = await import("@/lib/database/sqlite")
-    await deleteBoardDB(id)
-    
+    const { error } = await supabase.from("boards").delete().eq("id", id)
+
+    if (error) {
+      throw new Error("Failed to delete board")
+    }
+
     revalidatePath("/admin/content")
     return { success: true, message: "Board deleted successfully" }
   } catch (error) {
@@ -118,9 +290,22 @@ export async function deleteBoard(id: string) {
 }
 
 export async function getSubjectsForBoard(boardId: string, grade: number) {
+  const supabase = await createClient()
+
   try {
-    const { getSubjectsByBoardAndGrade } = await import("@/lib/database/sqlite")
-    return await getSubjectsByBoardAndGrade(boardId, grade)
+    const { data: subjects, error } = await supabase
+      .from("subjects")
+      .select("*")
+      .eq("board_id", boardId)
+      .eq("grade_level", grade)
+      .order("name")
+
+    if (error) {
+      console.error("Error fetching subjects:", error)
+      return []
+    }
+
+    return subjects || []
   } catch (error) {
     console.error("Error fetching subjects:", error)
     return []
@@ -128,10 +313,20 @@ export async function getSubjectsForBoard(boardId: string, grade: number) {
 }
 
 export async function createSubject(data: { name: string; code: string; boardId: string; gradeLevel: number }) {
+  const supabase = await createClient()
+
   try {
-    const { createSubject: createSubjectDB } = await import("@/lib/database/sqlite")
-    await createSubjectDB(data.boardId, data.name, data.code, data.gradeLevel)
-    
+    const { error } = await supabase.from("subjects").insert({
+      board_id: data.boardId,
+      name: data.name,
+      code: data.code,
+      grade_level: data.gradeLevel,
+    })
+
+    if (error) {
+      throw new Error("Failed to create subject")
+    }
+
     revalidatePath("/admin/content")
     return { success: true, message: "Subject created successfully" }
   } catch (error) {
@@ -141,9 +336,21 @@ export async function createSubject(data: { name: string; code: string; boardId:
 }
 
 export async function getTopicsForSubject(subjectId: string) {
+  const supabase = await createClient()
+
   try {
-    const { getTopicsBySubject } = await import("@/lib/database/sqlite")
-    return await getTopicsBySubject(subjectId)
+    const { data: topics, error } = await supabase
+      .from("topics")
+      .select("*")
+      .eq("subject_id", subjectId)
+      .order("order_index")
+
+    if (error) {
+      console.error("Error fetching topics:", error)
+      return []
+    }
+
+    return topics || []
   } catch (error) {
     console.error("Error fetching topics:", error)
     return []
@@ -151,10 +358,19 @@ export async function getTopicsForSubject(subjectId: string) {
 }
 
 export async function createTopic(data: { name: string; description?: string; subjectId: string }) {
+  const supabase = await createClient()
+
   try {
-    const { createTopic: createTopicDB } = await import("@/lib/database/sqlite")
-    await createTopicDB(data.subjectId, data.name, data.description)
-    
+    const { error } = await supabase.from("topics").insert({
+      subject_id: data.subjectId,
+      name: data.name,
+      description: data.description,
+    })
+
+    if (error) {
+      throw new Error("Failed to create topic")
+    }
+
     revalidatePath("/admin/content")
     return { success: true, message: "Topic created successfully" }
   } catch (error) {
@@ -165,9 +381,20 @@ export async function createTopic(data: { name: string; description?: string; su
 
 // AI Rules management
 export async function getAllAIRules() {
+  const supabase = await createClient()
+
   try {
-    const { getAIRules } = await import("@/lib/database/sqlite")
-    return await getAIRules()
+    const { data: aiRules, error } = await supabase
+      .from("ai_rules")
+      .select("*")
+      .order("rule_type")
+
+    if (error) {
+      console.error("Error fetching AI rules:", error)
+      return []
+    }
+
+    return aiRules || []
   } catch (error) {
     console.error("Error fetching AI rules:", error)
     return []
@@ -175,17 +402,30 @@ export async function getAllAIRules() {
 }
 
 export async function toggleAIRule(ruleId: string, ruleType: string) {
+  const supabase = await createClient()
+
   try {
-    const { getAIRules, updateAIRuleStatus } = await import("@/lib/database/sqlite")
-    const rules = await getAIRules()
-    const rule = rules.find((r: any) => r.id === ruleId)
-    
-    if (!rule) {
+    // Get current status
+    const { data: rule, error: fetchError } = await supabase
+      .from("ai_rules")
+      .select("is_active")
+      .eq("id", ruleId)
+      .single()
+
+    if (fetchError || !rule) {
       throw new Error("Rule not found")
     }
-    
-    await updateAIRuleStatus(ruleId, !rule.is_active)
-    
+
+    // Toggle status
+    const { error: updateError } = await supabase
+      .from("ai_rules")
+      .update({ is_active: !rule.is_active })
+      .eq("id", ruleId)
+
+    if (updateError) {
+      throw new Error("Failed to update rule status")
+    }
+
     revalidatePath("/admin/ai-rules")
     return { success: true, message: "Rule status updated successfully" }
   } catch (error) {
@@ -195,10 +435,21 @@ export async function toggleAIRule(ruleId: string, ruleType: string) {
 }
 
 export async function updateAIRule(ruleId: string, ruleType: string, name: string, description: string) {
+  const supabase = await createClient()
+
   try {
-    const { updateAIRuleContent } = await import("@/lib/database/sqlite")
-    await updateAIRuleContent(ruleId, name, description)
-    
+    const { error } = await supabase
+      .from("ai_rules")
+      .update({
+        title: name,
+        description: description,
+      })
+      .eq("id", ruleId)
+
+    if (error) {
+      throw new Error("Failed to update rule")
+    }
+
     revalidatePath("/admin/ai-rules")
     return { success: true, message: "Rule updated successfully" }
   } catch (error) {
@@ -209,9 +460,20 @@ export async function updateAIRule(ruleId: string, ruleType: string, name: strin
 
 // Bloom Samples management
 export async function getAllBloomSamples() {
+  const supabase = await createClient()
+
   try {
-    const { getBloomSamples } = await import("@/lib/database/sqlite")
-    return await getBloomSamples()
+    const { data: bloomSamples, error } = await supabase
+      .from("bloom_samples")
+      .select("*")
+      .order("bloom_level")
+
+    if (error) {
+      console.error("Error fetching bloom samples:", error)
+      return []
+    }
+
+    return bloomSamples || []
   } catch (error) {
     console.error("Error fetching bloom samples:", error)
     return []
@@ -219,10 +481,22 @@ export async function getAllBloomSamples() {
 }
 
 export async function createBloomSample(bloomLevel: string, grade: string, subject: string, question: string) {
+  const supabase = await createClient()
+
   try {
-    const { createBloomSample: createBloomSampleDB } = await import("@/lib/database/sqlite")
-    await createBloomSampleDB(bloomLevel, parseInt(grade), subject, 'mcq', question, `Sample ${bloomLevel} question for Grade ${grade} ${subject}`)
-    
+    const { error } = await supabase.from("bloom_samples").insert({
+      bloom_level: bloomLevel,
+      grade_level: parseInt(grade),
+      subject: subject,
+      question_type: "mcq",
+      sample_question: question,
+      explanation: `Sample ${bloomLevel} question for Grade ${grade} ${subject}`,
+    })
+
+    if (error) {
+      throw new Error("Failed to create sample question")
+    }
+
     revalidatePath("/admin/bloom-samples")
     return { success: true, message: "Sample question created successfully" }
   } catch (error) {
@@ -232,10 +506,24 @@ export async function createBloomSample(bloomLevel: string, grade: string, subje
 }
 
 export async function updateBloomSample(sampleId: string, bloomLevel: string, grade: string, subject: string, question: string) {
+  const supabase = await createClient()
+
   try {
-    const { updateBloomSample: updateBloomSampleDB } = await import("@/lib/database/sqlite")
-    await updateBloomSampleDB(sampleId, bloomLevel, parseInt(grade), subject, 'mcq', question, `Updated ${bloomLevel} question for Grade ${grade} ${subject}`)
-    
+    const { error } = await supabase
+      .from("bloom_samples")
+      .update({
+        bloom_level: bloomLevel,
+        grade_level: parseInt(grade),
+        subject: subject,
+        sample_question: question,
+        explanation: `Updated ${bloomLevel} question for Grade ${grade} ${subject}`,
+      })
+      .eq("id", sampleId)
+
+    if (error) {
+      throw new Error("Failed to update sample question")
+    }
+
     revalidatePath("/admin/bloom-samples")
     return { success: true, message: "Sample question updated successfully" }
   } catch (error) {
@@ -245,10 +533,18 @@ export async function updateBloomSample(sampleId: string, bloomLevel: string, gr
 }
 
 export async function deleteBloomSample(sampleId: string) {
+  const supabase = await createClient()
+
   try {
-    const { deleteBloomSample: deleteBloomSampleDB } = await import("@/lib/database/sqlite")
-    await deleteBloomSampleDB(sampleId)
-    
+    const { error } = await supabase
+      .from("bloom_samples")
+      .delete()
+      .eq("id", sampleId)
+
+    if (error) {
+      throw new Error("Failed to delete sample question")
+    }
+
     revalidatePath("/admin/bloom-samples")
     return { success: true, message: "Sample question deleted successfully" }
   } catch (error) {

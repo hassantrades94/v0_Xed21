@@ -459,12 +459,26 @@ export async function rejectQuestion(questionId: string, reason?: string) {
 }
 
 export async function getBoards() {
+  const supabase = await createClient()
+
   try {
-    const { getAllBoards } = await import("@/lib/database/sqlite")
-    return await getAllBoards()
+    const { data: boards, error } = await supabase
+      .from("boards")
+      .select("*")
+      .order("name")
+
+    if (error) {
+      console.error("Error fetching boards:", error)
+      return [
+        { id: "cbse", name: "CBSE/NCERT" },
+        { id: "icse", name: "ICSE/CISCE" },
+        { id: "state", name: "State Boards" },
+      ]
+    }
+
+    return boards || []
   } catch (error) {
     console.error("Error in getBoards:", error)
-    // Return mock data if any error occurs
     return [
       { id: "cbse", name: "CBSE/NCERT" },
       { id: "icse", name: "ICSE/CISCE" },
@@ -474,30 +488,64 @@ export async function getBoards() {
 }
 
 export async function getSubjectsByBoard(boardId: string, gradeLevel: number) {
+  const supabase = await createClient()
+
   try {
-    const { getSubjectsByBoardAndGrade } = await import("@/lib/database/sqlite")
-    return await getSubjectsByBoardAndGrade(boardId, gradeLevel)
+    const { data: subjects, error } = await supabase
+      .from("subjects")
+      .select("*")
+      .eq("board_id", boardId)
+      .eq("grade_level", gradeLevel)
+      .order("name")
+
+    if (error) {
+      console.error("Error fetching subjects:", error)
+      return [
+        { id: "cbse-science-6", name: "Science" },
+        { id: "cbse-math-6", name: "Mathematics" },
+        { id: "cbse-english-6", name: "English" },
+        { id: "cbse-hindi-6", name: "Hindi" },
+        { id: "cbse-sst-6", name: "Social Science" },
+      ]
+    }
+
+    return subjects || []
   } catch (error) {
     console.error("Error in getSubjectsByBoard:", error)
-    // Return mock data if any error occurs
-    const subjects = [
+    return [
       { id: "cbse-science-6", name: "Science" },
       { id: "cbse-math-6", name: "Mathematics" },
       { id: "cbse-english-6", name: "English" },
       { id: "cbse-hindi-6", name: "Hindi" },
       { id: "cbse-sst-6", name: "Social Science" },
     ]
-    return subjects
   }
 }
 
 export async function getTopicsBySubject(subjectId: string, boardId: string, gradeLevel: number) {
+  const supabase = await createClient()
+
   try {
-    const { getTopicsBySubject } = await import("@/lib/database/sqlite")
-    return await getTopicsBySubject(subjectId)
+    const { data: topics, error } = await supabase
+      .from("topics")
+      .select("*")
+      .eq("subject_id", subjectId)
+      .order("order_index")
+
+    if (error) {
+      console.error("Error fetching topics:", error)
+      return [
+        { id: "exploring-magnets", name: "Exploring Magnets" },
+        { id: "light-shadows", name: "Light and Shadows" },
+        { id: "motion-measurement", name: "Motion and Measurement" },
+        { id: "materials-around-us", name: "Materials Around Us" },
+        { id: "living-organisms", name: "Living Organisms and Their Surroundings" },
+        { id: "components-food", name: "Components of Food" },
+      ]
+    }
+    return topics || []
   } catch (error) {
     console.error("Error in getTopicsBySubject:", error)
-    // Return mock data if any error occurs
     return [
       { id: "exploring-magnets", name: "Exploring Magnets" },
       { id: "light-shadows", name: "Light and Shadows" },
