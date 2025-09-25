@@ -3,9 +3,6 @@ import 'server-only'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 
-// Conditional import to prevent client-side bundling
-const Database = typeof window === 'undefined' ? require('better-sqlite3') : null
-
 let db: Database.Database | null = null
 
 export async function getDatabase() {
@@ -17,8 +14,12 @@ export async function getDatabase() {
     return db
   }
 
+  // Dynamic import to prevent client-side bundling
+  const Database = await import('better-sqlite3')
+  const DatabaseConstructor = Database.default
+
   // Create database connection
-  db = new Database('database.sqlite')
+  db = new DatabaseConstructor('database.sqlite')
   
   // Enable foreign keys
   db.pragma('foreign_keys = ON')
