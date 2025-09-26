@@ -14,6 +14,7 @@ export async function signIn(prevState: any, formData: FormData) {
 
   try {
     const supabase = await createClient()
+    const adminSupabase = await createAdminClient()
     
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -24,8 +25,26 @@ export async function signIn(prevState: any, formData: FormData) {
       return { error: error?.message || "Invalid credentials" }
     }
 
+    // Verify user exists in users table using admin client
+    const { data: userProfile, error: userError } = await adminSupabase
+      .from("users")
+      .select("id, is_active")
+      .eq("id", data.user.id)
+      .single()
+
+    if (userError || !userProfile) {
+      console.error("[v0] User profile not found:", userError)
+      await supabase.auth.signOut()
+      return { error: "User profile not found. Please contact support." }
+    }
+
+    if (!userProfile.is_active) {
+      await supabase.auth.signOut()
+      return { error: "Account is suspended. Please contact support." }
+    }
     redirect("/dashboard")
   } catch (error) {
+    console.error("[v0] Login error:", error)
     return { error: "An unexpected error occurred" }
   }
 }
