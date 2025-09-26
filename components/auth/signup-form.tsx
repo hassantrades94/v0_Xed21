@@ -1,4 +1,5 @@
 "use client"
+import { useEffect } from "react"
 import { useActionState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,6 +12,16 @@ import { signUp } from "@/lib/actions/auth"
 
 export default function SignUpForm() {
   const [state, formAction, isPending] = useActionState(signUp, null)
+
+  // Auto-redirect on successful signup
+  useEffect(() => {
+    if (state?.success) {
+      const timer = setTimeout(() => {
+        window.location.href = "/auth/login"
+      }, 2000)
+      return () => clearTimeout(timer)
+    }
+  }, [state?.success])
 
   return (
     <div className="w-full max-w-2xl mx-auto">
@@ -39,7 +50,12 @@ export default function SignUpForm() {
             {state?.success && (
               <Alert className="border-green-200 bg-green-50 text-green-800">
                 <CheckCircle className="h-4 w-4" />
-                <AlertDescription>{state.success}</AlertDescription>
+                <AlertDescription>
+                  {state.success}
+                  <div className="mt-2 text-sm">
+                    Redirecting to login page in 2 seconds...
+                  </div>
+                </AlertDescription>
               </Alert>
             )}
 

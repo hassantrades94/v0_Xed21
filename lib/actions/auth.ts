@@ -34,7 +34,7 @@ export async function signUp(prevState: any, formData: FormData) {
   const email = formData.get("email") as string
   const password = formData.get("password") as string
   const fullName = formData.get("fullName") as string
-  const organization = formData.get("organization") as string
+  const organization = formData.get("organization") as string || null
   const phone = formData.get("phone") as string
 
   console.log("[v0] Starting signup process for:", email)
@@ -43,9 +43,31 @@ export async function signUp(prevState: any, formData: FormData) {
     return { error: "Email, password, and full name are required" }
   }
 
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!emailRegex.test(email)) {
+    return { error: "Please enter a valid email address" }
+  }
+
+  // Validate password strength
+  if (password.length < 6) {
+    return { error: "Password must be at least 6 characters long" }
+  }
+
   try {
     const supabase = await createClient()
     
+    // Check if user already exists
+    const { data: existingUser } = await supabase
+      .from("users")
+      .select("email")
+      .eq("email", email)
+      .single()
+
+    if (existingUser) {
+      return { error: "An account with this email already exists" }
+    }
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -59,22 +81,79 @@ export async function signUp(prevState: any, formData: FormData) {
     })
 
     if (error) {
+      console.error("[v0] Supabase auth signup error:", error)
       return { error: error.message }
     }
 
-    // Insert user data into users table
-    if (data.user) {
-      await supabase.from("users").insert({
-        id: data.user.id,
-        email: email,
-        full_name: fullName,
-        phone: phone || null,
-        organization: organization || null,
-        role: "educator",
-        wallet_balance: 500,
-        is_active: true,
-        is_verified: true,
-      })
+    if (!data.user) {
+      console.error("[v0] No user data returned from Supabase auth")
+      return { error: "Failed to create user account" }
+    }
+
+    console.log("[v0] Auth user created, inserting into users table:", data.user.id)
+
+    // Insert user data into users table with proper error handling
+    try {
+      const { data: insertedUser, error: insertError } = await supabase
+        .from("users")
+        .insert({
+          id: data.user.id,
+          email: email,
+          full_name: fullName,
+          phone: phone || null,
+          organization: organization || null,
+          role: "educator",
+          wallet_balance: 500.00,
+          is_active: true,
+          is_verified: true,
+        })
+        .select()
+        .single()
+
+      if (insertError) {
+        console.error("[v0] Database insert error:", insertError)
+        
+        // Clean up auth user if database insert fails
+        await supabase.auth.admin.deleteUser(data.user.id)
+        
+        return { error: "Failed to create user profile. Please try again." }
+      }
+
+      if (!insertedUser) {
+        console.error("[v0] No user data returned from insert")
+        return { error: "Failed to create user profile" }
+      }
+
+      console.log("[v0] User successfully inserted into database:", insertedUser.id)
+
+      // Record welcome bonus transaction
+      const { error: transactionError } = await supabase
+        .from("wallet_transactions")
+        .insert({
+          user_id: data.user.id,
+          transaction_type: "credit",
+          amount: 500.00,
+          balance_after: 500.00,
+          description: "Welcome bonus - Account creation",
+          status: "completed",
+        })
+
+      if (transactionError) {
+        console.error("[v0] Transaction insert error:", transactionError)
+        // Don't fail signup for transaction error, just log it
+      }
+
+    } catch (dbError) {
+      console.error("[v0] Database operation failed:", dbError)
+      
+      // Clean up auth user if database operations fail
+      try {
+        await supabase.auth.admin.deleteUser(data.user.id)
+      } catch (cleanupError) {
+        console.error("[v0] Failed to cleanup auth user:", cleanupError)
+      }
+      
+      return { error: "Database error occurred. Please try again." }
     }
 
     console.log("[v0] Signup completed successfully")
