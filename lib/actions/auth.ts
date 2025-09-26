@@ -100,28 +100,45 @@ export async function adminSignIn(prevState: any, formData: FormData) {
     return { error: "Email and password are required" }
   }
 
-  // Check admin credentials
-  if (email === "hassan.jobs07@gmail.com" && password === "Abutaleb@35") {
-    try {
-      const supabase = await createClient()
-      
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
+  try {
+    const supabase = await createClient()
+    
+    // First authenticate with Supabase
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
 
-      try {
-        revalidatePath("/", "layout")
-      } catch (error) {
-        console.warn("Revalidation skipped:", error)
-      }
-      redirect("/admin/dashboard")
-    } catch (error) {
-      console.error("Admin sign in error:", error)
-      redirect("/admin/dashboard")
+    if (error || !data.user) {
+      return { error: "Invalid credentials" }
     }
-  } else {
-    return { error: "Invalid admin credentials" }
+
+    // Check if user exists in admin_users table
+    const { data: adminUser, error: adminError } = await supabase
+      .from("admin_users")
+      .select("*")
+      .eq("email", email)
+      .eq("is_active", true)
+      .single()
+
+    if (adminError || !adminUser) {
+      // Sign out the user since they're not an admin
+      await supabase.auth.signOut()
+      return { error: "Access denied. Admin privileges required." }
+    }
+
+    // Successful admin login - revalidate and redirect
+    try {
+      revalidatePath("/", "layout")
+      revalidatePath("/admin")
+    } catch (error) {
+      console.warn("Revalidation skipped:", error)
+    }
+    
+    redirect("/admin/dashboard")
+  } catch (error) {
+    console.error("Admin sign in error:", error)
+    return { error: "An unexpected error occurred during login" }
   }
 }
 

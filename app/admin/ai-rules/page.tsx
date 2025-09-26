@@ -12,14 +12,16 @@ export default async function AdminAIRulesPage() {
     redirect("/admin/login")
   }
 
-  // Get admin profile from database
+  // Verify admin access
   const { data: adminProfile, error: adminError } = await supabase
     .from("admin_users")
     .select("*")
     .eq("email", user.email)
+    .eq("is_active", true)
     .single()
 
   if (adminError || !adminProfile) {
+    await supabase.auth.signOut()
     redirect("/admin/login")
   }
 

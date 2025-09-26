@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { useActionState } from "react"
 import { useFormStatus } from "react-dom"
 import { Button } from "@/components/ui/button"
@@ -14,7 +15,11 @@ function SubmitButton() {
   const { pending } = useFormStatus()
 
   return (
-    <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white" disabled={pending}>
+    <Button 
+      type="submit" 
+      className="w-full bg-blue-600 hover:bg-blue-700 text-white" 
+      disabled={pending}
+    >
       {pending ? (
         <>
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -32,6 +37,16 @@ function SubmitButton() {
 
 export default function AdminLoginForm() {
   const [state, formAction] = useActionState(adminSignIn, null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const handleSubmit = async (formData: FormData) => {
+    setIsSubmitting(true)
+    try {
+      await formAction(formData)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   return (
     <div className="w-full max-w-md mx-auto">
@@ -44,10 +59,16 @@ export default function AdminLoginForm() {
           <p className="text-center text-gray-400">Administrative access</p>
         </CardHeader>
         <CardContent>
-          <form action={formAction} className="space-y-4">
+          <form action={handleSubmit} className="space-y-4">
             {state?.error && (
               <Alert variant="destructive">
                 <AlertDescription>{state.error}</AlertDescription>
+              </Alert>
+            )}
+
+            {state?.success && (
+              <Alert className="border-green-200 bg-green-50 text-green-800">
+                <AlertDescription>{state.success}</AlertDescription>
               </Alert>
             )}
 
@@ -63,6 +84,7 @@ export default function AdminLoginForm() {
                   type="email"
                   placeholder="admin@xed21.com"
                   className="pl-10 bg-gray-700 border-gray-600 text-white placeholder:text-gray-400 focus:border-blue-400"
+                  disabled={isSubmitting}
                   required
                 />
               </div>
@@ -80,6 +102,7 @@ export default function AdminLoginForm() {
                   type="password"
                   placeholder="Enter admin password"
                   className="pl-10 bg-gray-700 border-gray-600 text-white placeholder:text-gray-400 focus:border-blue-400"
+                  disabled={isSubmitting}
                   required
                 />
               </div>

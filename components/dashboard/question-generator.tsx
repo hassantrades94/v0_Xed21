@@ -195,33 +195,29 @@ export default function QuestionGenerator({ userProfile, boards: initialBoards }
     startTransition(async () => {
       try {
         const result = await generateQuestions(formDataObj)
-        toast.success(result.message)
-
-        const mockQuestions = Array.from({ length: Number.parseInt(formData.questionCount) }, (_, i) => ({
-          id: i + 1,
-          type: formData.questionType,
-          question: `A team of students conducted an experiment by placing a bar magnet over iron filings spread on a sheet of paper. They observed that most filings gathered at specific parts of the magnet. Based on the diagram showing the distribution of iron filings, explain where the magnetic force is strongest on the bar magnet.`,
-          options: ["A) At both ends", "B) At the center", "C) On the sides", "D) Evenly distributed"],
-          correct_answer: "A",
-          explanation:
-            "The magnetic force is strongest at the poles, which are located at both ends of the magnet. This is where the magnetic field lines are most concentrated.",
-          explanations: [
-            {
-              option: "A",
-              text: "Correct. The magnetic force is strongest at the poles, which are located at both ends of the magnet.",
-            },
-            { option: "B", text: "Incorrect. The center of the magnet has the weakest magnetic force." },
-            { option: "C", text: "Incorrect. The sides do not exhibit the strongest magnetic force." },
-            { option: "D", text: "Incorrect. The magnetic force is not evenly distributed across the magnet." },
-          ],
-          bloom_level: formData.bloomTaxonomy,
-          confidence_score: Math.floor(Math.random() * 15) + 80, // 80-95
-          difficulty_indicator: "Medium",
-          estimated_time: 2,
-          marks: 1,
-        }))
-
-        setGeneratedQuestions(mockQuestions)
+        
+        if (result.success && result.questions) {
+          // Use real generated questions from database
+          const formattedQuestions = result.questions.map((q: any, index: number) => ({
+            id: q.id || index + 1,
+            type: q.question_type || formData.questionType,
+            question: q.question_text,
+            options: Array.isArray(q.options) ? q.options : JSON.parse(q.options || '[]'),
+            correct_answer: q.correct_answer,
+            explanation: q.explanation,
+            explanations: q.option_explanations || [],
+            bloom_level: q.bloom_taxonomy_level || formData.bloomTaxonomy,
+            confidence_score: q.confidence_score || 85,
+            difficulty_indicator: q.difficulty_level || "Medium",
+            estimated_time: q.estimated_time_minutes || 2,
+            marks: 1,
+          }))
+          
+          setGeneratedQuestions(formattedQuestions)
+          toast.success(result.message)
+        } else {
+          throw new Error(result.message || "Failed to generate questions")
+        }
         setShowGenerated(true)
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Failed to generate questions")

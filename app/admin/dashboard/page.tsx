@@ -12,14 +12,17 @@ export default async function AdminDashboardPage() {
     redirect("/admin/login")
   }
 
-  // Get admin profile from database
+  // Verify admin access by checking admin_users table
   const { data: adminProfile, error: adminError } = await supabase
     .from("admin_users")
     .select("*")
     .eq("email", user.email)
+    .eq("is_active", true)
     .single()
 
   if (adminError || !adminProfile) {
+    // User is authenticated but not an admin - sign them out and redirect
+    await supabase.auth.signOut()
     redirect("/admin/login")
   }
 

@@ -3,8 +3,8 @@ import Link from "next/link"
 import { BookOpen, Shield } from "lucide-react"
 
 export default function AdminLoginPage() {
-  // Remove Supabase auth check since it's causing issues in Bolt environment
-  // The authentication will be handled by the form submission instead
+  // Note: Authentication is handled by the form submission
+  // Redirect logic is in the auth action
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center px-4 py-12">
