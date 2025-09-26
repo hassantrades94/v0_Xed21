@@ -51,7 +51,7 @@ export default function WalletManager({ userProfile, transactions, stats }: Wall
     return type === "credit" ? "text-green-600" : "text-red-600"
   }
 
-  const formatTransactionType = (type: string, referenceType?: string) => {
+  const formatTransactionType = (type: string, referenceType?: string | null) => {
     if (type === "credit") {
       return referenceType === "top_up" ? "Wallet Top-up" : "Credit"
     } else if (type === "debit") {

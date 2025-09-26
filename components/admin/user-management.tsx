@@ -114,12 +114,18 @@ export default function UserManagement({ users, totalCount }: UserManagementProp
                     <span className="text-sm text-gray-900">{user.wallet_balance}</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                      Active
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      user.is_active 
+                        ? "bg-green-100 text-green-800" 
+                        : "bg-red-100 text-red-800"
+                    }`}>
+                      {user.is_active ? "Active" : "Suspended"}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm text-gray-500">{user.created_at}</span>
+                    <span className="text-sm text-gray-500">
+                      {new Date(user.created_at).toLocaleDateString()}
+                    </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
                     <Button variant="outline" size="sm" onClick={() => handleUpdateCoins(user)} disabled={isPending}>

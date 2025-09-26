@@ -33,12 +33,6 @@ function SubmitButton() {
 
 export default function LoginForm() {
   const [state, formAction] = useActionState(signIn, null)
-  const router = useRouter()
-
-  const handleDemoLogin = (e: React.FormEvent) => {
-    e.preventDefault()
-    router.push("/dashboard/generate")
-  }
 
   return (
     <div className="w-full max-w-md mx-auto">
@@ -48,7 +42,7 @@ export default function LoginForm() {
           <p className="text-center text-muted-foreground">Sign in to your account</p>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleDemoLogin} className="space-y-4">
+          <form action={formAction} className="space-y-4">
             {state?.error && (
               <Alert variant="destructive">
                 <AlertDescription>{state.error}</AlertDescription>

@@ -21,7 +21,7 @@ export async function signIn(prevState: any, formData: FormData) {
     })
 
     if (error || !data.user) {
-      return { error: "Invalid credentials" }
+      return { error: error?.message || "Invalid credentials" }
     }
 
     try {
@@ -29,7 +29,7 @@ export async function signIn(prevState: any, formData: FormData) {
     } catch (error) {
       console.warn("Revalidation skipped:", error)
     }
-    redirect("/dashboard/generate")
+    redirect("/dashboard")
   } catch (error) {
     return { error: "An unexpected error occurred" }
   }
