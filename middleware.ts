@@ -57,8 +57,6 @@ export async function middleware(request: NextRequest) {
         .eq("id", user.id)
         .eq("is_active", true)
         .single()
-  return NextResponse.next()
-}
 
       if (userError || !userProfile) {
         return NextResponse.redirect(new URL('/auth/signup', request.url))
@@ -68,6 +66,9 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/auth/login', request.url))
     }
   }
+
+  return NextResponse.next()
+}
 export const config = {
   matcher: [
     /*
