@@ -28,6 +28,7 @@ export async function signIn(prevState: any, formData: FormData) {
   } catch (error) {
     return { error: "An unexpected error occurred" }
   }
+}
 
 export async function signUp(prevState: any, formData: FormData) {
   const email = formData.get("email") as string
