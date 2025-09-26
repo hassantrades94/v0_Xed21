@@ -72,8 +72,10 @@ export default function BloomSamplesManagement({ samples: initialSamples }: Bloo
       if (result.success) {
         toast.success(result.message)
         setShowAddModal(false)
-      } else {
+        setSampleForm({ bloomLevel: "", grade: "", subject: "", question: "" })
         window.location.reload()
+      } else {
+        toast.error(result.message)
       }
     })
   }
