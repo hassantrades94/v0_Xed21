@@ -76,6 +76,7 @@ export default function ContentManagement({ boards: initialBoards }: ContentMana
     } catch (error) {
       console.error("Error loading subjects:", error)
       toast.error("Failed to load subjects")
+      setSubjects([])
     }
   }
 
@@ -86,6 +87,7 @@ export default function ContentManagement({ boards: initialBoards }: ContentMana
     } catch (error) {
       console.error("Error loading topics:", error)
       toast.error("Failed to load topics")
+      setTopics([])
     }
   }
 

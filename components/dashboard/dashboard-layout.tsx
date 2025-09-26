@@ -26,46 +26,24 @@ export default function DashboardLayout({ children, user, userProfile }: Dashboa
   const pathname = usePathname()
   const router = useRouter()
 
-  const supabaseClient = supabase
-
   useEffect(() => {
-    loadUserData()
-    loadTransactions()
+    if (userProfile?.id) {
+      loadTransactions()
+    }
   }, [])
 
-  const loadUserData = async () => {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (user) {
-        const { data: profile } = await supabase.from("users").select("*").eq("id", user.id).single()
-
-        if (profile) {
-          setRealUserData(profile)
-        }
-      }
-    } catch (error) {
-      console.error("Error loading user data:", error)
-    }
-  }
 
   const loadTransactions = async () => {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (user) {
-        const { data } = await supabase
-          .from("transactions")
-          .select("*")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false })
-          .limit(5)
+      const { data } = await supabase
+        .from("wallet_transactions")
+        .select("*")
+        .eq("user_id", userProfile.id)
+        .order("created_at", { ascending: false })
+        .limit(5)
 
-        if (data) {
-          setTransactions(data)
-        }
+      if (data) {
+        setTransactions(data)
       }
     } catch (error) {
       console.error("Error loading transactions:", error)
@@ -86,12 +64,7 @@ export default function DashboardLayout({ children, user, userProfile }: Dashboa
       .slice(0, 2)
   }
 
-  const displayUser = realUserData ||
-    userProfile || {
-      full_name: "Mamun",
-      email: "geology.cupb16@gmail.com",
-      wallet_balance: 9500,
-    }
+  const displayUser = userProfile
 
   const rechargePackages = [
     { amount: 100, coins: 200, bonus: 0 },

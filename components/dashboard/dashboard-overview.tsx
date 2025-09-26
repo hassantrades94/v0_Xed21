@@ -28,7 +28,10 @@ export default function DashboardOverview({ user, userProfile }: DashboardOvervi
   }, [userProfile?.id])
 
   const fetchDashboardData = async () => {
-    if (!userProfile?.id) return
+    if (!userProfile?.id) {
+      setLoading(false)
+      return
+    }
 
     const supabase = createClient()
 
@@ -69,6 +72,14 @@ export default function DashboardOverview({ user, userProfile }: DashboardOvervi
       setRecentActivity(transactions || [])
     } catch (error) {
       console.error("Error fetching dashboard data:", error)
+      // Set default values on error
+      setStats({
+        totalQuestions: 0,
+        thisMonthQuestions: 0,
+        avgTimeSaved: 0,
+        totalSpent: 0,
+      })
+      setRecentActivity([])
     } finally {
       setLoading(false)
     }

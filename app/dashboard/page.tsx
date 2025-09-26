@@ -1,29 +1,28 @@
 import DashboardLayout from "@/components/dashboard/dashboard-layout"
 import DashboardOverview from "@/components/dashboard/dashboard-overview"
+import { createClient } from "@/lib/supabase/server"
+import { redirect } from "next/navigation"
 
 export default async function DashboardPage() {
-  const mockUser = {
-    id: "demo-user-id",
-    email: "geology.cupb16@gmail.com",
-    user_metadata: {
-      full_name: "Mamun",
-    },
+  const supabase = await createClient()
+  
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) {
+    redirect("/auth/login")
   }
 
-  const mockUserProfile = {
-    id: "demo-profile-id",
-    email: "geology.cupb16@gmail.com",
-    full_name: "Mamun",
-    role: "educator",
-    wallet_balance: 9500,
-    organization: "Demo School",
-    phone: "+91 98765 43210",
-    created_at: "2025-01-15T10:00:00Z",
-  }
+  const { data: userProfile, error: profileError } = await supabase
+    .from("users")
+    .select("*")
+    .eq("id", user.id)
+    .single()
 
+  if (profileError || !userProfile) {
+    redirect("/auth/signup")
+  }
   return (
-    <DashboardLayout user={mockUser} userProfile={mockUserProfile}>
-      <DashboardOverview user={mockUser} userProfile={mockUserProfile} />
+    <DashboardLayout user={user} userProfile={userProfile}>
+      <DashboardOverview user={user} userProfile={userProfile} />
     </DashboardLayout>
   )
 }

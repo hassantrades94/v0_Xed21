@@ -55,9 +55,15 @@ export default function QuestionHistoryModal({ isOpen, onClose }: QuestionHistor
           .from("questions")
           .select(`
             *,
-            boards(name),
-            subjects(name),
-            topics(name)
+            topics!inner(
+              name,
+              subjects!inner(
+                name,
+                boards!inner(
+                  name
+                )
+              )
+            )
           `)
           .eq("user_id", user.id)
           .order("created_at", { ascending: false })
@@ -67,7 +73,7 @@ export default function QuestionHistoryModal({ isOpen, onClose }: QuestionHistor
           const groupedSets = questions.reduce((acc: any[], question: any) => {
             const existingSet = acc.find(
               (set) =>
-                set.subject === question.subjects?.name &&
+                set.subject === question.topics?.subjects?.name &&
                 set.topic === question.topics?.name &&
                 new Date(set.rawDate).toDateString() === new Date(question.created_at).toDateString(),
             )
@@ -78,7 +84,7 @@ export default function QuestionHistoryModal({ isOpen, onClose }: QuestionHistor
               options: question.options || [],
               correctAnswer: question.correct_answer,
               explanation: question.explanation,
-              confidence: question.confidence_score || 85,
+              confidence: 85, // Default confidence for display
             }
 
             if (existingSet) {
@@ -88,15 +94,15 @@ export default function QuestionHistoryModal({ isOpen, onClose }: QuestionHistor
               const date = new Date(question.created_at)
               acc.push({
                 id: question.id,
-                subject: question.subjects?.name || "Unknown Subject",
+                subject: question.topics?.subjects?.name || "Unknown Subject",
                 topic: question.topics?.name || "Unknown Topic",
-                board: question.boards?.name || "Unknown Board",
-                grade: `Grade ${question.grade_level || "Unknown"}`,
+                board: question.topics?.subjects?.boards?.name || "Unknown Board",
+                grade: `Grade ${question.topics?.subjects?.grade_level || "Unknown"}`,
                 date: date.toLocaleDateString(),
                 time: date.toLocaleTimeString(),
                 rawDate: question.created_at,
                 questionType: question.question_type || "Multiple Choice",
-                bloomsLevel: question.bloom_level || "understanding",
+                bloomsLevel: question.bloom_taxonomy_level || "understanding",
                 questionCount: 1,
                 questions: [questionData],
               })
@@ -109,32 +115,7 @@ export default function QuestionHistoryModal({ isOpen, onClose }: QuestionHistor
       }
     } catch (error) {
       console.error("Error loading question history:", error)
-      setQuestionSets([
-        {
-          id: "demo-1",
-          subject: "Science",
-          topic: "Exploring Magnets",
-          board: "CBSE/NCERT",
-          grade: "Grade 6",
-          date: "15 Aug 2025",
-          time: "09:14 am",
-          questionType: "Multiple Choice",
-          bloomsLevel: "understanding",
-          questionCount: 5,
-          questions: [
-            {
-              id: "q1",
-              question:
-                "A team of students conducted an experiment by placing a bar magnet over iron filings spread on a sheet of paper. They observed that most filings gathered at specific parts of the magnet. Based on the diagram showing the distribution of iron filings, explain where the magnetic force is strongest on the bar magnet.",
-              options: ["At both ends", "At the center", "On the sides", "Evenly distributed"],
-              correctAnswer: "A",
-              explanation:
-                "The magnetic force is strongest at the poles, which are located at both ends of the magnet.",
-              confidence: 85,
-            },
-          ],
-        },
-      ])
+      setQuestionSets([])
     } finally {
       setLoading(false)
     }

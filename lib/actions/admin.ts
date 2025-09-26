@@ -137,7 +137,7 @@ export async function getUsers(): Promise<User[]> {
   try {
     const { data: users, error } = await supabase
       .from("users")
-      .select("id, full_name, email, wallet_balance, is_active, created_at")
+      .select("*")
       .order("created_at", { ascending: false })
 
     if (error) {
