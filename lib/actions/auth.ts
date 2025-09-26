@@ -58,7 +58,14 @@ export async function signUp(prevState: any, formData: FormData) {
     const supabase = await createClient()
     const adminSupabase = await createAdminClient()
     
-    // Check if user already exists
+    // Check if user already exists in auth system
+    const { data: existingAuthUser, error: authCheckError } = await adminSupabase.auth.admin.getUserByEmail(email)
+    
+    if (existingAuthUser && existingAuthUser.user) {
+      return { error: "An account with this email already exists" }
+    }
+    
+    // Check if user already exists in users table
     const { data: existingUser } = await adminSupabase
       .from("users")
       .select("email")
