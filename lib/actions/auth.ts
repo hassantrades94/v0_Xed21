@@ -1,6 +1,6 @@
 "use server"
 
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { revalidatePath } from "next/cache"
 
@@ -28,7 +28,6 @@ export async function signIn(prevState: any, formData: FormData) {
   } catch (error) {
     return { error: "An unexpected error occurred" }
   }
-}
 
 export async function signUp(prevState: any, formData: FormData) {
   const email = formData.get("email") as string
@@ -56,9 +55,10 @@ export async function signUp(prevState: any, formData: FormData) {
 
   try {
     const supabase = await createClient()
+    const adminSupabase = await createAdminClient()
     
     // Check if user already exists
-    const { data: existingUser } = await supabase
+    const { data: existingUser } = await adminSupabase
       .from("users")
       .select("email")
       .eq("email", email)
@@ -94,7 +94,7 @@ export async function signUp(prevState: any, formData: FormData) {
 
     // Insert user data into users table with proper error handling
     try {
-      const { data: insertedUser, error: insertError } = await supabase
+      const { data: insertedUser, error: insertError } = await adminSupabase
         .from("users")
         .insert({
           id: data.user.id,
@@ -114,7 +114,7 @@ export async function signUp(prevState: any, formData: FormData) {
         console.error("[v0] Database insert error:", insertError)
         
         // Clean up auth user if database insert fails
-        await supabase.auth.admin.deleteUser(data.user.id)
+        await adminSupabase.auth.admin.deleteUser(data.user.id)
         
         return { error: "Failed to create user profile. Please try again." }
       }
@@ -127,7 +127,7 @@ export async function signUp(prevState: any, formData: FormData) {
       console.log("[v0] User successfully inserted into database:", insertedUser.id)
 
       // Record welcome bonus transaction
-      const { error: transactionError } = await supabase
+      const { error: transactionError } = await adminSupabase
         .from("wallet_transactions")
         .insert({
           user_id: data.user.id,
@@ -148,7 +148,7 @@ export async function signUp(prevState: any, formData: FormData) {
       
       // Clean up auth user if database operations fail
       try {
-        await supabase.auth.admin.deleteUser(data.user.id)
+        await adminSupabase.auth.admin.deleteUser(data.user.id)
       } catch (cleanupError) {
         console.error("[v0] Failed to cleanup auth user:", cleanupError)
       }
