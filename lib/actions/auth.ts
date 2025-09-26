@@ -24,11 +24,6 @@ export async function signIn(prevState: any, formData: FormData) {
       return { error: error?.message || "Invalid credentials" }
     }
 
-    try {
-      revalidatePath("/", "layout")
-    } catch (error) {
-      console.warn("Revalidation skipped:", error)
-    }
     redirect("/dashboard")
   } catch (error) {
     return { error: "An unexpected error occurred" }
@@ -128,13 +123,6 @@ export async function adminSignIn(prevState: any, formData: FormData) {
     }
 
     // Successful admin login - revalidate and redirect
-    try {
-      revalidatePath("/", "layout")
-      revalidatePath("/admin")
-    } catch (error) {
-      console.warn("Revalidation skipped:", error)
-    }
-    
     redirect("/admin/dashboard")
   } catch (error) {
     console.error("Admin sign in error:", error)
@@ -145,11 +133,6 @@ export async function adminSignIn(prevState: any, formData: FormData) {
 export async function signOut() {
   const supabase = await createClient()
   await supabase.auth.signOut()
-  try {
-    revalidatePath("/", "layout")
-  } catch (error) {
-    console.warn("Revalidation skipped:", error)
-  }
   redirect("/")
 }
 
