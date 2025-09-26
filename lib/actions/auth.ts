@@ -14,7 +14,6 @@ export async function signIn(prevState: any, formData: FormData) {
 
   try {
     const supabase = await createClient()
-    const adminSupabase = await createAdminClient()
     
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -25,23 +24,68 @@ export async function signIn(prevState: any, formData: FormData) {
       return { error: error?.message || "Invalid credentials" }
     }
 
-    // Verify user exists in users table using admin client
+    console.log("[v0] User authenticated successfully:", data.user.id)
+
+    // Verify user exists in users table using admin client with email lookup
+    const adminSupabase = await createAdminClient()
     const { data: userProfile, error: userError } = await adminSupabase
       .from("users")
       .select("id, is_active")
-      .eq("id", data.user.id)
+      .eq("email", email)
       .single()
 
     if (userError || !userProfile) {
-      console.error("[v0] User profile not found:", userError)
-      await supabase.auth.signOut()
-      return { error: "User profile not found. Please contact support." }
-    }
+      console.error("[v0] User profile not found for email:", email, "Error:", userError)
+      
+      // Try to create user profile if it doesn't exist but auth user does
+      try {
+        const { data: insertedUser, error: insertError } = await adminSupabase
+          .from("users")
+          .insert({
+            id: data.user.id,
+            email: email,
+            full_name: data.user.user_metadata?.full_name || email.split('@')[0],
+            phone: data.user.user_metadata?.phone || null,
+            organization: data.user.user_metadata?.organization || null,
+            role: "educator",
+            wallet_balance: 500.00,
+            is_active: true,
+            is_verified: true,
+          })
+          .select()
+          .single()
 
-    if (!userProfile.is_active) {
+        if (insertError) {
+          console.error("[v0] Failed to create user profile:", insertError)
+          await supabase.auth.signOut()
+          return { error: "Failed to create user profile. Please contact support." }
+        }
+
+        console.log("[v0] User profile created successfully:", insertedUser.id)
+        
+        // Record welcome bonus transaction
+        await adminSupabase
+          .from("wallet_transactions")
+          .insert({
+            user_id: data.user.id,
+            transaction_type: "credit",
+            amount: 500.00,
+            balance_after: 500.00,
+            description: "Welcome bonus - Account creation",
+            status: "completed",
+          })
+
+      } catch (createError) {
+        console.error("[v0] Error creating user profile:", createError)
+        await supabase.auth.signOut()
+        return { error: "User profile setup failed. Please contact support." }
+      }
+    } else if (!userProfile.is_active) {
       await supabase.auth.signOut()
       return { error: "Account is suspended. Please contact support." }
     }
+
+    console.log("[v0] Login successful for user:", userProfile.id)
     redirect("/dashboard")
   } catch (error) {
     console.error("[v0] Login error:", error)
