@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Edit } from "lucide-react"
-import { toggleAIRule, updateAIRule } from "@/lib/actions/admin"
+import { toggleAIRule, updateAIRule, createAIRule, deleteAIRule } from "@/lib/actions/admin"
 import { toast } from "@/components/ui/sonner"
 
 interface AIRuleManagementProps {
@@ -15,9 +15,17 @@ interface AIRuleManagementProps {
 }
 
 export default function AIRuleManagement({ aiRules }: AIRuleManagementProps) {
+  const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [selectedRule, setSelectedRule] = useState<any>(null)
   const [editForm, setEditForm] = useState({ name: "", description: "" })
+  const [createForm, setCreateForm] = useState({ 
+    ruleType: "global", 
+    category: "general", 
+    title: "", 
+    description: "" 
+  })
   const [isPending, startTransition] = useTransition()
 
   // Group AI rules by type
@@ -30,6 +38,7 @@ export default function AIRuleManagement({ aiRules }: AIRuleManagementProps) {
       const result = await toggleAIRule(rule.id, ruleType)
       if (result.success) {
         toast.success(result.message)
+        window.location.reload()
       } else {
         toast.error(result.message)
       }
@@ -42,6 +51,29 @@ export default function AIRuleManagement({ aiRules }: AIRuleManagementProps) {
     setShowEditModal(true)
   }
 
+  const handleDeleteRule = (rule: any) => {
+    setSelectedRule(rule)
+    setShowDeleteDialog(true)
+  }
+
+  const executeCreateRule = () => {
+    if (!createForm.title.trim() || !createForm.description.trim()) {
+      toast.error("Please fill in all fields")
+      return
+    }
+
+    startTransition(async () => {
+      const result = await createAIRule(createForm)
+      if (result.success) {
+        toast.success(result.message)
+        setShowCreateModal(false)
+        setCreateForm({ ruleType: "global", category: "general", title: "", description: "" })
+        window.location.reload()
+      } else {
+        toast.error(result.message)
+      }
+    })
+  }
   const executeRuleUpdate = () => {
     if (!selectedRule) return
 
@@ -55,12 +87,27 @@ export default function AIRuleManagement({ aiRules }: AIRuleManagementProps) {
       if (result.success) {
         toast.success(result.message)
         setShowEditModal(false)
+        window.location.reload()
       } else {
         toast.error(result.message)
       }
     })
   }
 
+  const executeDeleteRule = () => {
+    if (!selectedRule) return
+
+    startTransition(async () => {
+      const result = await deleteAIRule(selectedRule.id)
+      if (result.success) {
+        toast.success(result.message)
+        setShowDeleteDialog(false)
+        window.location.reload()
+      } else {
+        toast.error(result.message)
+      }
+    })
+  }
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -68,7 +115,12 @@ export default function AIRuleManagement({ aiRules }: AIRuleManagementProps) {
           <h1 className="text-2xl font-semibold text-gray-900">AI Rule Management</h1>
           <p className="text-gray-600">Configure AI behavior rules for question generation</p>
         </div>
-        <Button className="bg-blue-600 hover:bg-blue-700">Create Rule</Button>
+        <Button 
+          className="bg-blue-600 hover:bg-blue-700"
+          onClick={() => setShowCreateModal(true)}
+        >
+          Create Rule
+        </Button>
       </div>
 
       {/* Global Rules */}
@@ -103,6 +155,15 @@ export default function AIRuleManagement({ aiRules }: AIRuleManagementProps) {
                       disabled={isPending}
                     >
                       {rule.is_active ? "Disable" : "Enable"}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteRule(rule)}
+                      disabled={isPending}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
@@ -146,6 +207,15 @@ export default function AIRuleManagement({ aiRules }: AIRuleManagementProps) {
                     >
                       {rule.is_active ? "Disable" : "Enable"}
                     </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteRule(rule)}
+                      disabled={isPending}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
                 <p className="text-sm text-gray-700">{rule.description}</p>
@@ -188,6 +258,15 @@ export default function AIRuleManagement({ aiRules }: AIRuleManagementProps) {
                     >
                       {rule.is_active ? "Disable" : "Enable"}
                     </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteRule(rule)}
+                      disabled={isPending}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
                 <p className="text-sm text-gray-700">{rule.description}</p>
@@ -197,6 +276,66 @@ export default function AIRuleManagement({ aiRules }: AIRuleManagementProps) {
         </div>
       </div>
 
+      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Create New AI Rule</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Rule Type</label>
+                <Select 
+                  value={createForm.ruleType} 
+                  onValueChange={(value) => setCreateForm({ ...createForm, ruleType: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select rule type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="global">Global</SelectItem>
+                    <SelectItem value="question_type">Question Type</SelectItem>
+                    <SelectItem value="bloom_level">Bloom's Level</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                <Input
+                  value={createForm.category}
+                  onChange={(e) => setCreateForm({ ...createForm, category: e.target.value })}
+                  placeholder="e.g., general, formatting"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Rule Title</label>
+              <Input
+                value={createForm.title}
+                onChange={(e) => setCreateForm({ ...createForm, title: e.target.value })}
+                placeholder="Enter rule title"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Rule Description</label>
+              <Textarea
+                value={createForm.description}
+                onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}
+                rows={6}
+                placeholder="Enter detailed rule description and guidelines"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreateModal(false)}>
+              Cancel
+            </Button>
+            <Button onClick={executeCreateRule} disabled={isPending}>
+              {isPending ? "Creating..." : "Create Rule"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -227,6 +366,25 @@ export default function AIRuleManagement({ aiRules }: AIRuleManagementProps) {
             </Button>
             <Button onClick={executeRuleUpdate} disabled={isPending}>
               {isPending ? "Updating..." : "Update Rule"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Deletion</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-600">
+            Are you sure you want to delete the rule "{selectedRule?.title}"? This action cannot be undone and may affect AI question generation.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={executeDeleteRule} disabled={isPending}>
+              {isPending ? "Deleting..." : "Delete Rule"}
             </Button>
           </DialogFooter>
         </DialogContent>

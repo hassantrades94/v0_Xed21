@@ -357,6 +357,55 @@ export async function createSubject(data: { name: string; code: string; boardId:
   }
 }
 
+export async function updateSubject(id: string, data: { name: string; code: string; gradeLevel?: number }) {
+  await requireAdminAuth()
+  const supabase = await createAdminClient()
+
+  try {
+    const updateData: any = {
+      name: data.name,
+      code: data.code,
+    }
+    
+    if (data.gradeLevel) {
+      updateData.grade_level = data.gradeLevel
+    }
+
+    const { error } = await supabase
+      .from("subjects")
+      .update(updateData)
+      .eq("id", id)
+
+    if (error) {
+      throw new Error("Failed to update subject")
+    }
+
+    revalidatePath("/admin/content")
+    return { success: true, message: "Subject updated successfully" }
+  } catch (error) {
+    console.error("Error updating subject:", error)
+    return { success: false, message: "Failed to update subject" }
+  }
+}
+
+export async function deleteSubject(id: string) {
+  await requireAdminAuth()
+  const supabase = await createAdminClient()
+
+  try {
+    const { error } = await supabase.from("subjects").delete().eq("id", id)
+
+    if (error) {
+      throw new Error("Failed to delete subject")
+    }
+
+    revalidatePath("/admin/content")
+    return { success: true, message: "Subject deleted successfully" }
+  } catch (error) {
+    console.error("Error deleting subject:", error)
+    return { success: false, message: "Failed to delete subject" }
+  }
+}
 export async function getTopicsForSubject(subjectId: string): Promise<Topic[]> {
   const supabase = await createClient()
 
@@ -402,6 +451,94 @@ export async function createTopic(data: { name: string; description?: string; su
   }
 }
 
+export async function updateTopic(id: string, data: { name: string; description?: string }) {
+  await requireAdminAuth()
+  const supabase = await createAdminClient()
+
+  try {
+    const { error } = await supabase
+      .from("topics")
+      .update({
+        name: data.name,
+        description: data.description,
+      })
+      .eq("id", id)
+
+    if (error) {
+      throw new Error("Failed to update topic")
+    }
+
+    revalidatePath("/admin/content")
+    return { success: true, message: "Topic updated successfully" }
+  } catch (error) {
+    console.error("Error updating topic:", error)
+    return { success: false, message: "Failed to update topic" }
+  }
+}
+
+export async function deleteTopic(id: string) {
+  await requireAdminAuth()
+  const supabase = await createAdminClient()
+
+  try {
+    const { error } = await supabase.from("topics").delete().eq("id", id)
+
+    if (error) {
+      throw new Error("Failed to delete topic")
+    }
+
+    revalidatePath("/admin/content")
+    return { success: true, message: "Topic deleted successfully" }
+  } catch (error) {
+    console.error("Error deleting topic:", error)
+    return { success: false, message: "Failed to delete topic" }
+  }
+}
+
+export async function updateTopicContent(topicId: string, content: string) {
+  await requireAdminAuth()
+  const supabase = await createAdminClient()
+
+  try {
+    const { error } = await supabase
+      .from("topics")
+      .update({
+        description: content,
+      })
+      .eq("id", topicId)
+
+    if (error) {
+      throw new Error("Failed to update topic content")
+    }
+
+    revalidatePath("/admin/content")
+    return { success: true, message: "Topic content updated successfully" }
+  } catch (error) {
+    console.error("Error updating topic content:", error)
+    return { success: false, message: "Failed to update topic content" }
+  }
+}
+
+export async function getTopicContent(topicId: string) {
+  const supabase = await createClient()
+
+  try {
+    const { data: topic, error } = await supabase
+      .from("topics")
+      .select("name, description")
+      .eq("id", topicId)
+      .single()
+
+    if (error) {
+      throw new Error("Failed to fetch topic content")
+    }
+
+    return topic
+  } catch (error) {
+    console.error("Error fetching topic content:", error)
+    throw new Error("Failed to fetch topic content")
+  }
+}
 // AI Rules management
 export async function getAllAIRules() {
   const supabase = await createClient()
@@ -468,6 +605,7 @@ export async function updateAIRule(ruleId: string, ruleType: string, name: strin
       .update({
         title: name,
         description: description,
+        updated_at: new Date().toISOString(),
       })
       .eq("id", ruleId)
 
@@ -483,6 +621,49 @@ export async function updateAIRule(ruleId: string, ruleType: string, name: strin
   }
 }
 
+export async function createAIRule(data: { ruleType: string; category: string; title: string; description: string }) {
+  await requireAdminAuth()
+  const supabase = await createAdminClient()
+
+  try {
+    const { error } = await supabase.from("ai_rules").insert({
+      rule_type: data.ruleType,
+      category: data.category,
+      title: data.title,
+      description: data.description,
+      is_active: true,
+    })
+
+    if (error) {
+      throw new Error("Failed to create AI rule")
+    }
+
+    revalidatePath("/admin/ai-rules")
+    return { success: true, message: "AI rule created successfully" }
+  } catch (error) {
+    console.error("Error creating AI rule:", error)
+    return { success: false, message: "Failed to create AI rule" }
+  }
+}
+
+export async function deleteAIRule(ruleId: string) {
+  await requireAdminAuth()
+  const supabase = await createAdminClient()
+
+  try {
+    const { error } = await supabase.from("ai_rules").delete().eq("id", ruleId)
+
+    if (error) {
+      throw new Error("Failed to delete AI rule")
+    }
+
+    revalidatePath("/admin/ai-rules")
+    return { success: true, message: "AI rule deleted successfully" }
+  } catch (error) {
+    console.error("Error deleting AI rule:", error)
+    return { success: false, message: "Failed to delete AI rule" }
+  }
+}
 // Bloom Samples management
 export async function getAllBloomSamples() {
   const supabase = await createClient()

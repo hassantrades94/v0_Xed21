@@ -20,7 +20,7 @@ export async function createBoard(data: { name: string; description?: string; co
   const { data: adminUser, error: adminError } = await supabase
     .from("admin_users")
     .select("*")
-    .eq("id", user.id)
+    .eq("email", user.email)
     .single()
 
   if (adminError || !adminUser) {
@@ -42,7 +42,16 @@ export async function createBoard(data: { name: string; description?: string; co
 }
 
 export async function updateBoard(id: string, data: { name: string; description?: string; code?: string }) {
-  const supabase = createClient()
+  const supabase = await createClient()
+
+  // Check admin authentication
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) {
+    redirect("/admin/login")
+  }
 
   const { error } = await supabase
     .from("boards")
@@ -50,6 +59,7 @@ export async function updateBoard(id: string, data: { name: string; description?
       name: data.name,
       description: data.description,
       code: data.code,
+      updated_at: new Date().toISOString(),
     })
     .eq("id", id)
 
@@ -62,7 +72,16 @@ export async function updateBoard(id: string, data: { name: string; description?
 }
 
 export async function deleteBoard(id: string) {
-  const supabase = createClient()
+  const supabase = await createClient()
+
+  // Check admin authentication
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) {
+    redirect("/admin/login")
+  }
 
   const { error } = await supabase.from("boards").delete().eq("id", id)
 
@@ -76,13 +95,22 @@ export async function deleteBoard(id: string) {
 
 // Subject actions
 export async function createSubject(data: { name: string; description?: string; code?: string; boardId: string }) {
-  const supabase = createClient()
+  const supabase = await createClient()
+
+  // Check admin authentication
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) {
+    redirect("/admin/login")
+  }
 
   const { error } = await supabase.from("subjects").insert({
     name: data.name,
-    description: data.description,
     code: data.code,
     board_id: data.boardId,
+    grade_level: data.gradeLevel || 1,
   })
 
   if (error) {
@@ -94,14 +122,23 @@ export async function createSubject(data: { name: string; description?: string; 
 }
 
 export async function updateSubject(id: string, data: { name: string; description?: string; code?: string }) {
-  const supabase = createClient()
+  const supabase = await createClient()
+
+  // Check admin authentication
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) {
+    redirect("/admin/login")
+  }
 
   const { error } = await supabase
     .from("subjects")
     .update({
       name: data.name,
-      description: data.description,
       code: data.code,
+      updated_at: new Date().toISOString(),
     })
     .eq("id", id)
 
@@ -114,7 +151,16 @@ export async function updateSubject(id: string, data: { name: string; descriptio
 }
 
 export async function deleteSubject(id: string) {
-  const supabase = createClient()
+  const supabase = await createClient()
+
+  // Check admin authentication
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) {
+    redirect("/admin/login")
+  }
 
   const { error } = await supabase.from("subjects").delete().eq("id", id)
 
@@ -128,7 +174,16 @@ export async function deleteSubject(id: string) {
 
 // Topic actions
 export async function createTopic(data: { name: string; description?: string; subjectId: string }) {
-  const supabase = createClient()
+  const supabase = await createClient()
+
+  // Check admin authentication
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) {
+    redirect("/admin/login")
+  }
 
   const { error } = await supabase.from("topics").insert({
     name: data.name,
@@ -145,13 +200,23 @@ export async function createTopic(data: { name: string; description?: string; su
 }
 
 export async function updateTopic(id: string, data: { name: string; description?: string }) {
-  const supabase = createClient()
+  const supabase = await createClient()
+
+  // Check admin authentication
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) {
+    redirect("/admin/login")
+  }
 
   const { error } = await supabase
     .from("topics")
     .update({
       name: data.name,
       description: data.description,
+      updated_at: new Date().toISOString(),
     })
     .eq("id", id)
 
@@ -164,7 +229,16 @@ export async function updateTopic(id: string, data: { name: string; description?
 }
 
 export async function deleteTopic(id: string) {
-  const supabase = createClient()
+  const supabase = await createClient()
+
+  // Check admin authentication
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) {
+    redirect("/admin/login")
+  }
 
   const { error } = await supabase.from("topics").delete().eq("id", id)
 
@@ -174,4 +248,59 @@ export async function deleteTopic(id: string) {
 
   revalidatePath("/admin/content")
   return { success: true, message: "Topic deleted successfully" }
+}
+
+// Topic content management actions
+export async function updateTopicContent(topicId: string, content: string) {
+  const supabase = await createClient()
+
+  // Check admin authentication
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+  if (authError || !user) {
+    redirect("/admin/login")
+  }
+
+  const { data: adminUser, error: adminError } = await supabase
+    .from("admin_users")
+    .select("*")
+    .eq("email", user.email)
+    .single()
+
+  if (adminError || !adminUser) {
+    redirect("/admin/login")
+  }
+
+  const { error } = await supabase
+    .from("topics")
+    .update({
+      description: content,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", topicId)
+
+  if (error) {
+    throw new Error("Failed to update topic content")
+  }
+
+  revalidatePath("/admin/content")
+  return { success: true, message: "Topic content updated successfully" }
+}
+
+export async function getTopicContent(topicId: string) {
+  const supabase = await createClient()
+
+  const { data: topic, error } = await supabase
+    .from("topics")
+    .select("name, description")
+    .eq("id", topicId)
+    .single()
+
+  if (error) {
+    throw new Error("Failed to fetch topic content")
+  }
+
+  return topic
 }

@@ -12,6 +12,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { User, Mail, Phone, Building, Shield, Save, Key, Trash2 } from "lucide-react"
+import { updateUserProfile, updateUserPassword } from "@/lib/actions/profile"
+import { useToast } from "@/components/ui/toast"
 
 interface ProfileSettingsProps {
   user: any
@@ -19,6 +21,7 @@ interface ProfileSettingsProps {
 }
 
 export default function ProfileSettings({ user, userProfile }: ProfileSettingsProps) {
+  const { toast } = useToast()
   const [profileData, setProfileData] = useState({
     fullName: userProfile?.full_name || "",
     email: user?.email || "",
@@ -32,6 +35,7 @@ export default function ProfileSettings({ user, userProfile }: ProfileSettingsPr
     confirmPassword: "",
   })
   const [loading, setLoading] = useState(false)
+  const [passwordLoading, setPasswordLoading] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
 
@@ -42,11 +46,23 @@ export default function ProfileSettings({ user, userProfile }: ProfileSettingsPr
     setSuccess("")
 
     try {
-      // This would update the user profile in Supabase
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      setSuccess("Profile updated successfully!")
+      const formData = new FormData()
+      formData.append("fullName", profileData.fullName)
+      formData.append("phone", profileData.phone)
+      formData.append("organization", profileData.organization)
+      formData.append("role", profileData.role)
+
+      const result = await updateUserProfile(formData)
+      if (result.success) {
+        setSuccess(result.message)
+        toast({ title: "Success", description: result.message })
+        // Refresh the page to show updated data
+        setTimeout(() => window.location.reload(), 1000)
+      }
     } catch (err) {
-      setError("Failed to update profile. Please try again.")
+      const errorMessage = err instanceof Error ? err.message : "Failed to update profile. Please try again."
+      setError(errorMessage)
+      toast({ title: "Error", description: errorMessage, variant: "destructive" })
     } finally {
       setLoading(false)
     }
@@ -54,25 +70,39 @@ export default function ProfileSettings({ user, userProfile }: ProfileSettingsPr
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
+    setPasswordLoading(true)
     setError("")
     setSuccess("")
 
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       setError("New passwords don't match.")
-      setLoading(false)
+      setPasswordLoading(false)
       return
     }
 
+    if (passwordData.newPassword.length < 6) {
+      setError("Password must be at least 6 characters long.")
+      setPasswordLoading(false)
+      return
+    }
     try {
-      // This would update the password in Supabase
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      setSuccess("Password updated successfully!")
-      setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" })
+      const formData = new FormData()
+      formData.append("currentPassword", passwordData.currentPassword)
+      formData.append("newPassword", passwordData.newPassword)
+      formData.append("confirmPassword", passwordData.confirmPassword)
+
+      const result = await updateUserPassword(formData)
+      if (result.success) {
+        setSuccess(result.message)
+        toast({ title: "Success", description: result.message })
+        setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" })
+      }
     } catch (err) {
-      setError("Failed to update password. Please try again.")
+      const errorMessage = err instanceof Error ? err.message : "Failed to update password. Please try again."
+      setError(errorMessage)
+      toast({ title: "Error", description: errorMessage, variant: "destructive" })
     } finally {
-      setLoading(false)
+      setPasswordLoading(false)
     }
   }
 
@@ -136,6 +166,7 @@ export default function ProfileSettings({ user, userProfile }: ProfileSettingsPr
                         onChange={(e) => updateProfileData("fullName", e.target.value)}
                         className="pl-10"
                         placeholder="Your full name"
+                        required
                       />
                     </div>
                   </div>
@@ -223,6 +254,7 @@ export default function ProfileSettings({ user, userProfile }: ProfileSettingsPr
                     value={passwordData.currentPassword}
                     onChange={(e) => updatePasswordData("currentPassword", e.target.value)}
                     placeholder="Enter current password"
+                    required
                   />
                 </div>
 
@@ -235,6 +267,8 @@ export default function ProfileSettings({ user, userProfile }: ProfileSettingsPr
                       value={passwordData.newPassword}
                       onChange={(e) => updatePasswordData("newPassword", e.target.value)}
                       placeholder="Enter new password"
+                      required
+                      minLength={6}
                     />
                   </div>
 
@@ -246,6 +280,8 @@ export default function ProfileSettings({ user, userProfile }: ProfileSettingsPr
                       value={passwordData.confirmPassword}
                       onChange={(e) => updatePasswordData("confirmPassword", e.target.value)}
                       placeholder="Confirm new password"
+                      required
+                      minLength={6}
                     />
                   </div>
                 </div>
@@ -253,10 +289,10 @@ export default function ProfileSettings({ user, userProfile }: ProfileSettingsPr
                 <Button
                   type="submit"
                   className="bg-green-600 hover:bg-green-700 text-white"
-                  disabled={loading || !passwordData.currentPassword || !passwordData.newPassword}
+                  disabled={passwordLoading || !passwordData.currentPassword || !passwordData.newPassword}
                 >
                   <Shield className="mr-2 h-4 w-4" />
-                  {loading ? "Updating..." : "Update Password"}
+                  {passwordLoading ? "Updating..." : "Update Password"}
                 </Button>
               </form>
             </CardContent>

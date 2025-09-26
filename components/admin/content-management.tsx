@@ -15,7 +15,9 @@ import {
   createSubject, 
   createTopic, 
   getSubjectsForBoard, 
-  getTopicsForSubject 
+  getTopicsForSubject,
+  updateTopicContent,
+  getTopicContent
 } from "@/lib/actions/admin"
 
 interface ContentManagementProps {
@@ -37,7 +39,7 @@ export default function ContentManagement({ boards: initialBoards }: ContentMana
   const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = useState(false)
   const [showAddSubjectModal, setShowAddSubjectModal] = useState(false)
   const [showAddTopicModal, setShowAddTopicModal] = useState(false)
-  const [currentContent, setCurrentContent] = useState({ title: "", content: "" })
+  const [currentContent, setCurrentContent] = useState({ title: "", content: "", topicId: "" })
   const [newBoardName, setNewBoardName] = useState("")
   const [newBoardCode, setNewBoardCode] = useState("")
   const [newBoardDescription, setNewBoardDescription] = useState("")
@@ -48,6 +50,8 @@ export default function ContentManagement({ boards: initialBoards }: ContentMana
   const [isPending, startTransition] = useTransition()
   const [subjects, setSubjects] = useState<any[]>([])
   const [topics, setTopics] = useState<any[]>([])
+  const [loadingContent, setLoadingContent] = useState(false)
+  const [savingContent, setSavingContent] = useState(false)
 
   useEffect(() => {
     if (boards.length > 0 && !selectedBoardId) {
@@ -98,7 +102,25 @@ export default function ContentManagement({ boards: initialBoards }: ContentMana
     }
   }
 
-  const openContentModal = (topicName: string) => {
+  const openContentModal = async (topicName: string, topicId: string) => {
+    setLoadingContent(true)
+    try {
+      const topicData = await getTopicContent(topicId)
+      setCurrentContent({
+        title: topicName,
+        content: topicData.description || `Chapter - ${topicName}\n\nContent for this topic will be added here. This content will be used by the AI to generate contextually relevant questions.\n\nPlease add detailed information about:\n- Key concepts and definitions\n- Important facts and principles\n- Examples and applications\n- Common misconceptions\n- Learning objectives`,
+        topicId: topicId,
+      })
+    } catch (error) {
+      console.error("Error loading topic content:", error)
+      setCurrentContent({
+        title: topicName,
+        content: `Chapter - ${topicName}\n\nContent for this topic will be added here. This content will be used by the AI to generate contextually relevant questions.\n\nPlease add detailed information about:\n- Key concepts and definitions\n- Important facts and principles\n- Examples and applications\n- Common misconceptions\n- Learning objectives`,
+        topicId: topicId,
+      })
+    } finally {
+      setLoadingContent(false)
+    }
     setCurrentContent({
       title: topicName,
       content: `Chapter 1 - ${topicName}\n\nAs human beings, we have always been curious about our surroundings. We start exploring our surroundings and asking questions right from our childhood. Did you enjoy discovering and exploring the world around you in the Preparatory Stage of school? As you enter the Middle Stage, we will continue this fascinating journey, trying to explore and understand the beautiful world we live in. And for that, we have a new subject, Science. Welcome to the wonderful world of Science!\n\nScience is a way of thinking, observing and doing things to understand the world we live in and to uncover the secrets of the universe. Think of it as a big adventure—we ask questions, explore, and then try to find answers to our questions. For this, the most important thing is to be curious and ask questions.`,
@@ -106,6 +128,28 @@ export default function ContentManagement({ boards: initialBoards }: ContentMana
     setShowContentModal(true)
   }
 
+  const saveTopicContent = async () => {
+    if (!currentContent.topicId || !currentContent.content.trim()) {
+      toast.error("Content cannot be empty")
+      return
+    }
+
+    setSavingContent(true)
+    try {
+      const result = await updateTopicContent(currentContent.topicId, currentContent.content)
+      if (result.success) {
+        toast.success(result.message)
+        setShowContentModal(false)
+      } else {
+        toast.error("Failed to save content")
+      }
+    } catch (error) {
+      console.error("Error saving topic content:", error)
+      toast.error("Failed to save content")
+    } finally {
+      setSavingContent(false)
+    }
+  }
   const addBoard = async () => {
     if (!newBoardName.trim() || !newBoardCode.trim()) {
       toast.error("Please fill in board name and code")
@@ -376,10 +420,15 @@ export default function ContentManagement({ boards: initialBoards }: ContentMana
                                       <Button
                                         variant="ghost"
                                         size="sm"
-                                        onClick={() => openContentModal(topic.name)}
+                                        onClick={() => openContentModal(topic.name, topic.id)}
                                         title="Manage content"
+                                        disabled={loadingContent}
                                       >
-                                        <FileText className="h-4 w-4" />
+                                        {loadingContent ? (
+                                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600" />
+                                        ) : (
+                                          <FileText className="h-4 w-4" />
+                                        )}
                                       </Button>
                                       <Button
                                         variant="ghost"
@@ -430,32 +479,18 @@ export default function ContentManagement({ boards: initialBoards }: ContentMana
               </Button>
             </div>
             <p className="text-sm text-gray-600">
-              Upload files or add text content for this topic. AI will extract information from uploaded files.
+              Add text content for this topic. This content will be used by the AI to generate contextually relevant questions.
             </p>
           </DialogHeader>
 
           <div className="space-y-6">
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Upload Files</h3>
-                <span className="text-sm text-gray-500">PDF, DOCX, XLSX, CSV, TXT</span>
-              </div>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
-                <input type="file" className="w-full" accept=".pdf,.docx,.xlsx,.csv,.txt" />
-                <p className="text-sm text-gray-500 mt-2">
-                  When you upload a file, AI will automatically extract all relevant information and replace any
-                  existing content for this topic.
-                </p>
-              </div>
-            </div>
 
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Manual Content</h3>
-                <Button variant="outline" size="sm">
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add Content
-                </Button>
+                <h3 className="text-lg font-semibold">Topic Content</h3>
+                <div className="text-sm text-gray-500">
+                  This content will be used by AI for question generation
+                </div>
               </div>
 
               <div className="space-y-4">
@@ -466,7 +501,11 @@ export default function ContentManagement({ boards: initialBoards }: ContentMana
                     onChange={(e) => setCurrentContent({ ...currentContent, content: e.target.value })}
                     rows={12}
                     className="w-full"
+                    placeholder="Enter detailed content about this topic..."
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Include key concepts, definitions, examples, and important facts. This helps the AI generate better questions.
+                  </p>
                 </div>
               </div>
             </div>
@@ -476,8 +515,19 @@ export default function ContentManagement({ boards: initialBoards }: ContentMana
             <Button variant="outline" onClick={() => setShowContentModal(false)}>
               Cancel
             </Button>
-            <Button onClick={() => setShowContentModal(false)} className="bg-blue-600 hover:bg-blue-700">
-              Update Content
+            <Button 
+              onClick={saveTopicContent} 
+              className="bg-blue-600 hover:bg-blue-700"
+              disabled={savingContent}
+            >
+              {savingContent ? (
+                <>
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />
+                  Saving...
+                </>
+              ) : (
+                "Save Content"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

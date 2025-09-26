@@ -12,7 +12,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Loader2, User, Mail, Phone, Building, Calendar, Shield, CheckCircle } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+import { updateUserProfile } from "@/lib/actions/profile"
+import { useToast } from "@/components/ui/toast"
 
 interface ProfileManagerProps {
   user: any
@@ -20,6 +21,7 @@ interface ProfileManagerProps {
 }
 
 export default function ProfileManager({ user, userProfile }: ProfileManagerProps) {
+  const { toast } = useToast()
   const [formData, setFormData] = useState({
     fullName: userProfile?.full_name || "",
     phone: userProfile?.phone || "",
@@ -36,29 +38,25 @@ export default function ProfileManager({ user, userProfile }: ProfileManagerProp
     setError("")
     setSuccess("")
 
-    const supabase = createClient()
 
     try {
-      const { error } = await supabase
-        .from("users")
-        .update({
-          full_name: formData.fullName,
-          phone: formData.phone,
-          organization: formData.organization,
-          role: formData.role,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", userProfile.id)
+      const formDataObj = new FormData()
+      formDataObj.append("fullName", formData.fullName)
+      formDataObj.append("phone", formData.phone)
+      formDataObj.append("organization", formData.organization)
+      formDataObj.append("role", formData.role)
 
-      if (error) {
-        setError(error.message)
-      } else {
-        setSuccess("Profile updated successfully!")
+      const result = await updateUserProfile(formDataObj)
+      if (result.success) {
+        setSuccess(result.message)
+        toast({ title: "Success", description: result.message })
         // Refresh the page to show updated data
-        window.location.reload()
+        setTimeout(() => window.location.reload(), 1000)
       }
     } catch (err) {
-      setError("An unexpected error occurred. Please try again.")
+      const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred. Please try again."
+      setError(errorMessage)
+      toast({ title: "Error", description: errorMessage, variant: "destructive" })
     } finally {
       setLoading(false)
     }
@@ -289,7 +287,10 @@ export default function ProfileManager({ user, userProfile }: ProfileManagerProp
                       Updating Profile...
                     </>
                   ) : (
-                    "Update Profile"
+                    <>
+                      <Save className="mr-2 h-4 w-4" />
+                      Save Changes
+                    </>
                   )}
                 </Button>
               </form>
